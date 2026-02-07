@@ -480,8 +480,6 @@ func (w *NetworkWorker) syncDiscoveredTokensInBatch(ctx context.Context) error {
 		return nil
 	}
 
-	log.Println("🔍 Syncing", len(entities), "discovered tokens for", w.config.Name)
-
 	query = "INSERT INTO tokens (chain_id, token_address, first_seen_block) VALUES "
 	values := make([]interface{}, 0, len(entities))
 	valuesPlaceholder := make([]string, 0, len(entities))
@@ -496,12 +494,10 @@ func (w *NetworkWorker) syncDiscoveredTokensInBatch(ctx context.Context) error {
 	}
 
 	query += strings.Join(valuesPlaceholder, ", ") + " ON CONFLICT (chain_id, token_address) DO NOTHING"
-	count, err := w.db.Pool().Exec(ctx, query, values...)
+	_, err = w.db.Pool().Exec(ctx, query, values...)
 	if err != nil {
 		return err
 	}
-
-	log.Println("✅ Synced", count.RowsAffected(), "discovered tokens for", w.config.Name)
 
 	return nil
 }
