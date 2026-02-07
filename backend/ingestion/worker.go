@@ -22,8 +22,62 @@ type NetworkWorker struct {
 	addressSet map[string]bool
 }
 
+func (w *NetworkWorker) tokenDiscovery(ctx context.Context) error {
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		err := w.syncDiscoveredTokensInBatch(ctx)
+		if err != nil {
+			log.Println("Error syncing discovered tokens", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second * time.Duration(w.config.TokenMetadata.DiscoveryIntervalSeconds)):
+		}
+	}
+
+}
+
+func (w *NetworkWorker) syncTokenMetadata(ctx context.Context) error {
+
+	for {
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		entities, err := w.fetchTokensForMetadataSyncInBatch(ctx)
+		if err != nil {
+			log.Println("Error fetching tokens for metadata sync", err)
+			continue
+		}
+
+		err = w.fetchTokensMetadata(ctx, entities)
+		if err != nil {
+			log.Println("Error fetching tokens metadata", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second * time.Duration(w.config.TokenMetadata.MetadataFetchIntervalSeconds)):
+
+		}
+	}
+
+}
+
 func (w *NetworkWorker) start(ctx context.Context) error {
-	log.Println("Network worker started for", w.config.Name, "chain")
+	log.Println("🔗 Started", w.config.Name, "ingestion worker")
 	addresses, err := w.getAllAddresses(ctx)
 	if err != nil {
 		return err
@@ -35,6 +89,17 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 
 	retryDelay := time.Duration(w.config.SyncWorker.RetryDelayMs) * time.Millisecond
 	maxDelay := time.Duration(w.config.SyncWorker.MaxDelayMs) * time.Millisecond
+
+	// start syncing erc20 token metadata in the background
+	// 1. do a token discovery i.e
+	//  Find ERC-20 token contracts that have appeared in transfers, that we haven’t yet inserted into tokens,
+	//  ordered by when we first saw them. Then save this batch to the tokens table.
+	go w.tokenDiscovery(ctx)
+
+	// 2. do a token metadata fetch i.e
+	// Read directly from the tokens table in batch and fetch the metadata for each token from the rpc,
+	// then update the token
+	go w.syncTokenMetadata(ctx)
 
 	for {
 
@@ -110,7 +175,10 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 			continue
 		}
 
-		log.Println("✅ Block", nextBlock, "committed successfully")
+		if nextBlock%1000 == 0 {
+			log.Printf("✅ %s ingested up to block %d", w.config.Name, nextBlock)
+		}
+
 		// reset retry delay
 		retryDelay = time.Duration(w.config.SyncWorker.RetryDelayMs) * time.Millisecond
 	}
@@ -132,6 +200,10 @@ func (w *NetworkWorker) getAllAddresses(ctx context.Context) ([]db.AddressRegist
 			return nil, err
 		}
 		entities = append(entities, entity)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return entities, nil
@@ -170,8 +242,6 @@ func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, block int64)
 	return logs, nil
 
 }
-
-func (w *NetworkWorker) ingestERC20(ctx context.Context) {}
 
 func (w *NetworkWorker) fetchBlockWithTransactions(ctx context.Context, blockNumber int64) (RPCBlock, error) {
 
@@ -358,4 +428,264 @@ func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, blo
 	_, err = tx.Exec(ctx, query, values...)
 
 	return err
+}
+
+func (w *NetworkWorker) fetchBatchTokenMetadata(ctx context.Context, tokenAddresses []string) {
+
+}
+
+func (w *NetworkWorker) syncDiscoveredTokensInBatch(ctx context.Context) error {
+	query := `
+	select chain_id, token_address, first_seen_block
+	from (
+		select
+			et.chain_id,
+			et.token_address,
+			min(et.block_number) as first_seen_block
+		from erc20_transfers et
+		where et.chain_id = $1 and not exists (
+			select 1
+			from tokens t
+			where t.chain_id = et.chain_id
+			and t.token_address = et.token_address
+		)
+		group by et.chain_id, et.token_address
+	) s
+	order by first_seen_block
+	limit $2;
+	`
+	rows, err := w.db.Pool().Query(ctx, query, w.config.ChainID, w.config.TokenDiscoveryBatchSize)
+
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	entities := make([]db.TokenEntity, 0)
+
+	for rows.Next() {
+		var entity db.TokenEntity
+		err := rows.Scan(&entity.ChainID, &entity.TokenAddress, &entity.FirstSeenBlock)
+		if err != nil {
+			return err
+		}
+		entities = append(entities, entity)
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if len(entities) == 0 {
+		return nil
+	}
+
+	log.Println("🔍 Syncing", len(entities), "discovered tokens for", w.config.Name)
+
+	query = "INSERT INTO tokens (chain_id, token_address, first_seen_block) VALUES "
+	values := make([]interface{}, 0, len(entities))
+	valuesPlaceholder := make([]string, 0, len(entities))
+	counter := 0
+
+	for _, entity := range entities {
+		currentPlaceholder := fmt.Sprintf("($%d, $%d, $%d)", counter+1, counter+2, counter+3)
+		counter += 3
+
+		values = append(values, entity.ChainID, entity.TokenAddress, entity.FirstSeenBlock)
+		valuesPlaceholder = append(valuesPlaceholder, currentPlaceholder)
+	}
+
+	query += strings.Join(valuesPlaceholder, ", ") + " ON CONFLICT (chain_id, token_address) DO NOTHING"
+	count, err := w.db.Pool().Exec(ctx, query, values...)
+	if err != nil {
+		return err
+	}
+
+	log.Println("✅ Synced", count.RowsAffected(), "discovered tokens for", w.config.Name)
+
+	return nil
+}
+
+func (w *NetworkWorker) fetchTokensMetadata(ctx context.Context, entities []db.TokenEntity) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	sem := make(chan struct{}, w.config.TokenMetadata.RpcBatchSize)
+
+	for _, entity := range entities {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case sem <- struct{}{}:
+		}
+
+		go func(token db.TokenEntity) {
+			defer func() { <-sem }()
+
+			meta, err := w.fetchTokenMetadata(ctx, token)
+
+			if meta.Name == nil || meta.Symbol == nil || meta.Decimals == nil {
+				w.markTokenMetadataFetchFailed(ctx, token)
+				return
+			}
+
+			err = w.updateTokenMetadata(ctx, token, meta)
+			if err != nil {
+				log.Println("Error updating token metadata", err)
+			}
+		}(entity)
+	}
+
+	return nil
+}
+
+func (w *NetworkWorker) fetchTokenMetadataDecimals(ctx context.Context, tokenAddress string) (int8, error) {
+	rawResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.call(ctx, "eth_call", []interface{}{map[string]interface{}{
+			"to":    tokenAddress,
+			"input": w.config.TokenMetadata.RpcCalls["decimals"],
+		}, "latest"})
+	})
+
+	if err != nil {
+		log.Println("Error fetching token metadata decimals", tokenAddress, err)
+		return 0, err
+	}
+
+	var decimals string
+
+	err = json.Unmarshal(rawResult, &decimals)
+	if err != nil {
+		return 0, err
+	}
+
+	d, err := decodeUint8(decimals)
+	if err != nil {
+		return 0, err
+	}
+
+	return int8(d), nil
+}
+
+func (w *NetworkWorker) fetchTokenMetadataName(ctx context.Context, tokenAddress string) (string, error) {
+	rawResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.call(ctx, "eth_call", []interface{}{map[string]interface{}{
+			"to":    tokenAddress,
+			"input": w.config.TokenMetadata.RpcCalls["name"],
+		}, "latest"})
+	})
+
+	if err != nil {
+		log.Println("Error fetching token metadata name", tokenAddress, err)
+		return "", err
+	}
+
+	var name string
+
+	err = json.Unmarshal(rawResult, &name)
+	if err != nil {
+		return "", err
+	}
+
+	return decodeStringOrBytes32(name)
+}
+
+func (w *NetworkWorker) fetchTokenMetadataSymbol(ctx context.Context, tokenAddress string) (string, error) {
+	rawResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.call(ctx, "eth_call", []interface{}{map[string]interface{}{
+			"to":    tokenAddress,
+			"input": w.config.TokenMetadata.RpcCalls["symbol"],
+		}, "latest"})
+	})
+
+	if err != nil {
+		log.Println("Error fetching token metadata symbol", tokenAddress, err)
+		return "", err
+	}
+
+	var symbol string
+
+	err = json.Unmarshal(rawResult, &symbol)
+
+	if err != nil {
+		return "", err
+	}
+
+	return decodeStringOrBytes32(symbol)
+}
+
+func (w *NetworkWorker) fetchTokenMetadata(ctx context.Context, entity db.TokenEntity) (*TokenMetadata, error) {
+
+	meta := &TokenMetadata{}
+	tokenAddress := formatAddress(entity.TokenAddress)
+
+	// decimals (most important)
+	decimals, err := w.fetchTokenMetadataDecimals(ctx, tokenAddress)
+	if err == nil {
+		meta.Decimals = &decimals
+	}
+
+	name, err := w.fetchTokenMetadataName(ctx, tokenAddress)
+	if err == nil {
+		meta.Name = &name
+	}
+	symbol, err := w.fetchTokenMetadataSymbol(ctx, tokenAddress)
+	if err == nil {
+		meta.Symbol = &symbol
+	}
+
+	return meta, nil
+}
+
+func (w *NetworkWorker) updateTokenMetadata(ctx context.Context, entity db.TokenEntity, meta *TokenMetadata) error {
+	query := "UPDATE tokens SET symbol = $1, name = $2, decimals = $3, metadata_fetch_failed_at = null WHERE chain_id = $4 AND token_address = $5"
+	_, err := w.db.Pool().Exec(ctx, query, meta.Symbol, meta.Name, meta.Decimals, entity.ChainID, entity.TokenAddress)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (w *NetworkWorker) markTokenMetadataFetchFailed(ctx context.Context, entity db.TokenEntity) error {
+	query := "UPDATE tokens SET metadata_fetch_failed_at = now() WHERE chain_id = $1 AND token_address = $2"
+	_, err := w.db.Pool().Exec(ctx, query, entity.ChainID, entity.TokenAddress)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w *NetworkWorker) fetchTokensForMetadataSyncInBatch(ctx context.Context) ([]db.TokenEntity, error) {
+	query := `
+	select chain_id, token_address
+	from tokens
+	where chain_id = $1
+	and (symbol is null or name is null or decimals is null)
+	and (metadata_fetch_failed_at is null or metadata_fetch_failed_at < now() - make_interval(hours => $2))
+	limit $3;
+	`
+	rows, err := w.db.Pool().Query(ctx, query, w.config.ChainID, w.config.TokenMetadata.FailedIntervalHours, w.config.TokenMetadata.DbBatchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entities := make([]db.TokenEntity, 0)
+	for rows.Next() {
+		var entity db.TokenEntity
+		err := rows.Scan(&entity.ChainID, &entity.TokenAddress)
+		if err != nil {
+			return nil, err
+		}
+		entities = append(entities, entity)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return entities, nil
+
 }

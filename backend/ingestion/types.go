@@ -23,3 +23,9 @@ type RPCLog struct {
 	LogIndex    string   `json:"logIndex"`
 	BlockNumber string   `json:"blockNumber"`
 }
+
+type TokenMetadata struct {
+	Symbol   *string `json:"symbol"`
+	Name     *string `json:"name"`
+	Decimals *int8   `json:"decimals"`
+}
