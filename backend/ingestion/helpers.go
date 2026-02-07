@@ -15,20 +15,19 @@ func hexToUint64(s string) (uint64, error) {
 }
 
 func hexToBigInt(s string) (*big.Int, error) {
-    v := strings.TrimPrefix(s, "0x")
-    if v == "" {
-        return big.NewInt(0), nil
-    }
+	v := strings.TrimPrefix(s, "0x")
+	if v == "" {
+		return big.NewInt(0), nil
+	}
 
-    n := new(big.Int)
-    _, ok := n.SetString(v, 16)
-    if !ok {
-        return nil, fmt.Errorf("invalid hex integer: %s", s)
-    }
+	n := new(big.Int)
+	_, ok := n.SetString(v, 16)
+	if !ok {
+		return nil, fmt.Errorf("invalid hex integer: %s", s)
+	}
 
-    return n, nil
+	return n, nil
 }
-
 
 func normalizeAddress(addr string) string {
 	a := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(addr), "0x"))

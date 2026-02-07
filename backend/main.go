@@ -29,15 +29,16 @@ func main() {
 	}
 	defer db.Close()
 
+	server := server.NewServer(config.Api.Port)
+	ingestion := ingestion.New(db, config)
+
 	// Start the server in a goroutine
 	go func(c context.Context) {
-		server := server.NewServer(config.Api.Port)
 		server.Start(c)
 	}(ctx)
 
 	// Start the ingestion service in a goroutine
 	go func(c context.Context) {
-		ingestion := ingestion.New(db, config)
 		err := ingestion.Start(c)
 		if err != nil {
 			log.Println("Error starting ingestion service", err)
@@ -53,8 +54,7 @@ func main() {
 
 	done := make(chan struct{})
 	go func() {
-		// simulate some cleanup work
-		// time.Sleep(6 * time.Second)
+		ingestion.Cleanup(timeoutCtx)
 		close(done)
 	}()
 
