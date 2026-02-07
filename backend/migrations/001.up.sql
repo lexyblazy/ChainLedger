@@ -66,13 +66,15 @@ CREATE INDEX idx_native_block_timestamp ON native_transfers (block_timestamp);
 
 -- Token Metadata
 CREATE TABLE tokens (
-    chain_id        INTEGER NOT NULL,
-    token_address   TEXT NOT NULL,
-    symbol          TEXT,
-    name            TEXT,
-    decimals        INTEGER,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    chain_id                  INTEGER NOT NULL,
+    token_address             TEXT NOT NULL,
+    symbol                    TEXT,
+    name                      TEXT,
+    decimals                  INTEGER,
+    first_seen_block          BIGINT,
+    metadata_fetch_failed_at  TIMESTAMPTZ,
+    created_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at                TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     PRIMARY KEY (chain_id, token_address)
 );
