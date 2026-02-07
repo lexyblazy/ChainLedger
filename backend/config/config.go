@@ -17,13 +17,24 @@ type WorkerConfig struct {
 }
 
 type NetworkConfig struct {
-	StartBlock         int                `json:"startBlock"`
-	ERC20TransferTopic string             `json:"erc20TransferTopic"`
-	RPCUrl             string             `json:"rpcURL"`
-	ChainID            int                `json:"chainId"`
-	Name               string             `json:"name"`
-	RPCRateLimit       RPCRateLimitConfig `json:"rpcRateLimit"`
-	SyncWorker         WorkerConfig       `json:"syncWorker"`
+	StartBlock              int                 `json:"startBlock"`
+	ERC20TransferTopic      string              `json:"erc20TransferTopic"`
+	RPCUrl                  string              `json:"rpcURL"`
+	ChainID                 int                 `json:"chainId"`
+	Name                    string              `json:"name"`
+	RPCRateLimit            RPCRateLimitConfig  `json:"rpcRateLimit"`
+	SyncWorker              WorkerConfig        `json:"syncWorker"`
+	TokenMetadata           TokenMetadataConfig `json:"tokenMetadata"`
+	TokenDiscoveryBatchSize int                 `json:"tokenDiscoveryBatchSize"`
+}
+
+type TokenMetadataConfig struct {
+	DbBatchSize                  int               `json:"dbBatchSize"`
+	RpcBatchSize                 int               `json:"rpcBatchSize"`
+	FailedIntervalHours          int               `json:"failedIntervalHours"`
+	RpcCalls                     map[string]string `json:"rpcCalls"`
+	DiscoveryIntervalSeconds     int               `json:"discoveryIntervalSeconds"`
+	MetadataFetchIntervalSeconds int               `json:"metadataFetchIntervalSeconds"`
 }
 
 type ApiConfig struct {
