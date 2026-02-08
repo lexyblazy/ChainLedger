@@ -4,29 +4,37 @@ import (
 	"context"
 	"log"
 	"net/http"
+
+	"polychain.capital/config"
+	"polychain.capital/db"
+	"polychain.capital/ingestion"
 )
 
 type Server struct {
-	port string
+	port   string
+	db     *db.DB
+	config *config.Config
+	i      *ingestion.IngestionService
 }
 
-func NewServer(port string) *Server {
-	return &Server{port: port}
+func New(db *db.DB, config *config.Config, i *ingestion.IngestionService) *Server {
+	return &Server{port: config.Api.Port, db: db, config: config, i: i}
+}
+
+func (s *Server) SetupRoutes(router *http.ServeMux) {
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello, World!"))
+	})
+
+	router.HandleFunc("/status", s.status)
 }
 
 func (s *Server) Start(ctx context.Context) {
 	log.Println("Starting server on port", s.port)
 	router := http.NewServeMux()
 
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello, World!"))
-	})
-
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
+	s.SetupRoutes(router)
 
 	server := &http.Server{
 		Addr:    ":" + s.port,
