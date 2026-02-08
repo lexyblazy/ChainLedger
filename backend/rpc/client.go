@@ -1,4 +1,4 @@
-package ingestion
+package rpc
 
 import (
 	"bytes"
@@ -11,17 +11,17 @@ import (
 	"polychain.capital/config"
 )
 
-type RPCClient struct {
+type Client struct {
 	url     string
 	client  *http.Client
-	limiter *RPCLimiter
+	limiter *RateLimiter
 	config  *config.RPCRateLimitConfig
 }
 
-func NewRPCClient(networkConfig *config.NetworkConfig) *RPCClient {
-	limiter := NewRPCLimiter(networkConfig.RPCRateLimit.RPS, networkConfig.RPCRateLimit.Burst)
+func New(networkConfig *config.NetworkConfig) *Client {
+	limiter := NewRateLimiter(networkConfig.RPCRateLimit.RPS, networkConfig.RPCRateLimit.Burst)
 
-	return &RPCClient{
+	return &Client{
 		url: networkConfig.RPCUrl,
 		client: &http.Client{
 			Timeout: 15 * time.Second,
@@ -50,10 +50,7 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-func (c *RPCClient) call(
-	ctx context.Context,
-	method string,
-	params interface{}) (json.RawMessage, error) {
+func (c *Client) Call(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
 
 	reqBody := rpcRequest{
 		JSONRPC: "2.0",
@@ -101,7 +98,7 @@ func (c *RPCClient) call(
 	return rpcResp.Result, nil
 }
 
-func (c *RPCClient) callRpcWithRetry(ctx context.Context, rpcCall func() (json.RawMessage, error)) (json.RawMessage, error) {
+func (c *Client) CallRpcWithRetry(ctx context.Context, rpcCall func() (json.RawMessage, error)) (json.RawMessage, error) {
 
 	var lastError error
 	var result json.RawMessage

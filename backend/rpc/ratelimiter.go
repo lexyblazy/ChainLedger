@@ -1,16 +1,16 @@
-package ingestion
+package rpc
 
 import (
 	"context"
 	"time"
 )
 
-type RPCLimiter struct {
+type RateLimiter struct {
 	tokens chan struct{}
 }
 
-func NewRPCLimiter(rps int, burst int) *RPCLimiter {
-	l := &RPCLimiter{tokens: make(chan struct{}, burst)}
+func NewRateLimiter(rps int, burst int) *RateLimiter {
+	l := &RateLimiter{tokens: make(chan struct{}, burst)}
 
 	// fill the channel with the burst size
 	for range burst {
@@ -33,7 +33,7 @@ func NewRPCLimiter(rps int, burst int) *RPCLimiter {
 	return l
 }
 
-func (l *RPCLimiter) Acquire(ctx context.Context) error {
+func (l *RateLimiter) Acquire(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
