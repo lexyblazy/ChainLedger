@@ -17,7 +17,7 @@ type WorkerConfig struct {
 }
 
 type NetworkConfig struct {
-	StartBlock              int                 `json:"startBlock"`
+	StartBlock              int64               `json:"startBlock"`
 	ERC20TransferTopic      string              `json:"erc20TransferTopic"`
 	RPCUrl                  string              `json:"rpcURL"`
 	ChainID                 int                 `json:"chainId"`

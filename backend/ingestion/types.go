@@ -1,31 +1,19 @@
 package ingestion
 
-type RPCBlock struct {
-	Number       string           `json:"number"`
-	Hash         string           `json:"hash"`
-	ParentHash   string           `json:"parentHash"`
-	Timestamp    string           `json:"timestamp"`
-	Transactions []RPCTransaction `json:"transactions"`
-}
-
-type RPCTransaction struct {
-	Hash  string `json:"hash"`
-	From  string `json:"from"`
-	To    string `json:"to"`
-	Value string `json:"value"` // hex wei
-}
-
-type RPCLog struct {
-	Address     string   `json:"address"` // token contract
-	Topics      []string `json:"topics"`
-	Data        string   `json:"data"`
-	TxHash      string   `json:"transactionHash"`
-	LogIndex    string   `json:"logIndex"`
-	BlockNumber string   `json:"blockNumber"`
-}
-
 type TokenMetadata struct {
 	Symbol   *string `json:"symbol"`
 	Name     *string `json:"name"`
 	Decimals *int8   `json:"decimals"`
+}
+
+type NetworkStatus struct {
+	Name                         string  `json:"name"`
+	ChainID                      int64   `json:"chainId"`
+	StartBlock                   int64   `json:"startBlock"`
+	BestRpcBlockNumber           int64   `json:"bestRpcBlockNumber"`
+	IngestedBlocksCount          int64   `json:"ingestedBlocksCount"`
+	IngestedBlocksMaxBlockNumber int64   `json:"ingestedBlocksMaxBlockNumber"`
+	TokensCount                  int64   `json:"tokensCount"`
+	IngestionLagBlocksCount      int64   `json:"ingestionLagBlocksCount"`
+	IngestionProgressPct         float64 `json:"ingestionProgressPct"`
 }

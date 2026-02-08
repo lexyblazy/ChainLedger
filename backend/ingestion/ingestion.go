@@ -3,9 +3,11 @@ package ingestion
 import (
 	"context"
 	"log"
+	"strconv"
 
 	"polychain.capital/config"
 	"polychain.capital/db"
+	"polychain.capital/rpc"
 )
 
 type IngestionService struct {
@@ -23,7 +25,7 @@ func New(db *db.DB, config *config.Config) *IngestionService {
 		network := netCfg
 		workers[network.ChainID] = &NetworkWorker{
 			db:         db,
-			rpcc:       NewRPCClient(&network),
+			rpcc:       rpc.New(&network),
 			config:     &network,
 			addressSet: make(map[string]bool),
 		}
@@ -64,4 +66,18 @@ func (s *IngestionService) Cleanup(ctx context.Context) {
 		close(errCh)
 	}
 
+}
+
+func (s *IngestionService) GetStatus(ctx context.Context) (map[string]NetworkStatus, error) {
+	status := make(map[string]NetworkStatus)
+	for chanId, nw := range s.nw {
+		networkStatus, err := nw.getStatus(ctx)
+
+		if err != nil {
+			log.Println("Error getting status for", nw.config.Name, "ingestion worker", err)
+			continue
+		}
+		status[strconv.Itoa(chanId)] = networkStatus
+	}
+	return status, nil
 }
