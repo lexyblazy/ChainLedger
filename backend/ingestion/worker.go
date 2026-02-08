@@ -13,11 +13,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"polychain.capital/config"
 	"polychain.capital/db"
+	"polychain.capital/rpc"
 )
 
 type NetworkWorker struct {
 	db         *db.DB
-	rpcc       *RPCClient
+	rpcc       *rpc.Client
 	config     *config.NetworkConfig
 	addressSet map[string]bool
 }
@@ -104,8 +105,8 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 	for {
 
 		var (
-			block                     RPCBlock
-			erc20TransferLogs         []RPCLog
+			block                     rpc.Block
+			erc20TransferLogs         []rpc.Log
 			fetchBlockErr             error
 			fetchERC20TransferLogsErr error
 			commitBlockErr            error
@@ -151,14 +152,14 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 		if fetchBlockErr != nil {
 			log.Println("error fetching block transactions", fetchBlockErr)
 			time.Sleep(retryDelay)
-			retryDelay *= 2
+			retryDelay = min(retryDelay*2, maxDelay)
 			continue
 		}
 
 		if fetchERC20TransferLogsErr != nil {
 			log.Println("error fetching erc20 transfer logs", fetchERC20TransferLogsErr)
 			time.Sleep(retryDelay)
-			retryDelay *= 2
+			retryDelay = min(retryDelay*2, maxDelay)
 			continue
 		}
 
@@ -219,10 +220,10 @@ func (w *NetworkWorker) fetchLastProcessedBlock(ctx context.Context) (int64, err
 
 }
 
-func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, block int64) ([]RPCLog, error) {
+func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, block int64) ([]rpc.Log, error) {
 
-	rpcResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
-		return w.rpcc.call(ctx, "eth_getLogs", []interface{}{map[string]interface{}{
+	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.Call(ctx, "eth_getLogs", []interface{}{map[string]interface{}{
 			"fromBlock": block,
 			"toBlock":   block,
 			"topics":    []string{w.config.ERC20TransferTopic},
@@ -233,7 +234,7 @@ func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, block int64)
 		return nil, err
 	}
 
-	var logs []RPCLog
+	var logs []rpc.Log
 	err = json.Unmarshal(rpcResult, &logs)
 	if err != nil {
 		return nil, err
@@ -243,26 +244,26 @@ func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, block int64)
 
 }
 
-func (w *NetworkWorker) fetchBlockWithTransactions(ctx context.Context, blockNumber int64) (RPCBlock, error) {
+func (w *NetworkWorker) fetchBlockWithTransactions(ctx context.Context, blockNumber int64) (rpc.Block, error) {
 
-	rpcResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
-		return w.rpcc.call(ctx, "eth_getBlockByNumber", []interface{}{blockNumber, true})
+	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.Call(ctx, "eth_getBlockByNumber", []interface{}{blockNumber, true})
 	})
 	if err != nil {
-		return RPCBlock{}, err
+		return rpc.Block{}, err
 	}
 
-	var block RPCBlock
+	var block rpc.Block
 	err = json.Unmarshal(rpcResult, &block)
 	if err != nil {
-		return RPCBlock{}, err
+		return rpc.Block{}, err
 	}
 
 	return block, nil
 }
 
-func (w *NetworkWorker) filterTransactions(transactions []RPCTransaction) []RPCTransaction {
-	filteredTransactions := make([]RPCTransaction, 0)
+func (w *NetworkWorker) filterTransactions(transactions []rpc.Transaction) []rpc.Transaction {
+	filteredTransactions := make([]rpc.Transaction, 0)
 
 	for _, transaction := range transactions {
 
@@ -277,8 +278,8 @@ func (w *NetworkWorker) filterTransactions(transactions []RPCTransaction) []RPCT
 	return filteredTransactions
 }
 
-func (w *NetworkWorker) filterERC20TransferLogs(logs []RPCLog) []RPCLog {
-	filteredLogs := make([]RPCLog, 0)
+func (w *NetworkWorker) filterERC20TransferLogs(logs []rpc.Log) []rpc.Log {
+	filteredLogs := make([]rpc.Log, 0)
 
 	for _, l := range logs {
 		method := l.Topics[0]
@@ -297,7 +298,7 @@ func (w *NetworkWorker) filterERC20TransferLogs(logs []RPCLog) []RPCLog {
 	return filteredLogs
 }
 
-func (w *NetworkWorker) commitBlock(ctx context.Context, block RPCBlock, erc20TransferLogs []RPCLog) error {
+func (w *NetworkWorker) commitBlock(ctx context.Context, block rpc.Block, erc20TransferLogs []rpc.Log) error {
 
 	return w.db.RunInTx(ctx, func(tx pgx.Tx) error {
 
@@ -324,7 +325,7 @@ func (w *NetworkWorker) commitBlock(ctx context.Context, block RPCBlock, erc20Tr
 	})
 }
 
-func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, block RPCBlock) error {
+func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, block rpc.Block) error {
 
 	if len(block.Transactions) == 0 {
 		return nil
@@ -365,7 +366,7 @@ func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, bl
 	return err
 }
 
-func (w *NetworkWorker) insertBlock(ctx context.Context, tx pgx.Tx, block RPCBlock) error {
+func (w *NetworkWorker) insertBlock(ctx context.Context, tx pgx.Tx, block rpc.Block) error {
 	blockNumber, err := hexToUint64(block.Number)
 	if err != nil {
 		return err
@@ -382,7 +383,7 @@ func (w *NetworkWorker) insertBlock(ctx context.Context, tx pgx.Tx, block RPCBlo
 	return err
 }
 
-func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, block RPCBlock, erc20TransferLogs []RPCLog) error {
+func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, block rpc.Block, erc20TransferLogs []rpc.Log) error {
 
 	if len(erc20TransferLogs) == 0 {
 		return nil
@@ -537,8 +538,8 @@ func (w *NetworkWorker) fetchTokensMetadata(ctx context.Context, entities []db.T
 }
 
 func (w *NetworkWorker) fetchTokenMetadataDecimals(ctx context.Context, tokenAddress string) (int8, error) {
-	rawResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
-		return w.rpcc.call(ctx, "eth_call", []interface{}{map[string]interface{}{
+	rawResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.Call(ctx, "eth_call", []interface{}{map[string]interface{}{
 			"to":    tokenAddress,
 			"input": w.config.TokenMetadata.RpcCalls["decimals"],
 		}, "latest"})
@@ -565,8 +566,8 @@ func (w *NetworkWorker) fetchTokenMetadataDecimals(ctx context.Context, tokenAdd
 }
 
 func (w *NetworkWorker) fetchTokenMetadataName(ctx context.Context, tokenAddress string) (string, error) {
-	rawResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
-		return w.rpcc.call(ctx, "eth_call", []interface{}{map[string]interface{}{
+	rawResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.Call(ctx, "eth_call", []interface{}{map[string]interface{}{
 			"to":    tokenAddress,
 			"input": w.config.TokenMetadata.RpcCalls["name"],
 		}, "latest"})
@@ -588,8 +589,8 @@ func (w *NetworkWorker) fetchTokenMetadataName(ctx context.Context, tokenAddress
 }
 
 func (w *NetworkWorker) fetchTokenMetadataSymbol(ctx context.Context, tokenAddress string) (string, error) {
-	rawResult, err := w.rpcc.callRpcWithRetry(ctx, func() (json.RawMessage, error) {
-		return w.rpcc.call(ctx, "eth_call", []interface{}{map[string]interface{}{
+	rawResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.Call(ctx, "eth_call", []interface{}{map[string]interface{}{
 			"to":    tokenAddress,
 			"input": w.config.TokenMetadata.RpcCalls["symbol"],
 		}, "latest"})
@@ -683,5 +684,85 @@ func (w *NetworkWorker) fetchTokensForMetadataSyncInBatch(ctx context.Context) (
 	}
 
 	return entities, nil
+
+}
+
+func (w *NetworkWorker) getBestRpcBlockNumber(ctx context.Context) (int64, error) {
+	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.Call(ctx, "eth_blockNumber", []interface{}{"latest", false})
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	var blockNumber string
+	err = json.Unmarshal(rpcResult, &blockNumber)
+
+	if err != nil {
+		return 0, err
+	}
+
+	val, err := hexToUint64(blockNumber)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return int64(val), nil
+}
+
+func (w *NetworkWorker) getStatus(ctx context.Context) (NetworkStatus, error) {
+	var status NetworkStatus
+	var err error
+	status.Name = w.config.Name
+	status.ChainID = int64(w.config.ChainID)
+	status.StartBlock = w.config.StartBlock
+
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	// get best rpc block number
+	go func() {
+		defer wg.Done()
+		status.BestRpcBlockNumber, err = w.getBestRpcBlockNumber(ctx)
+
+		if err != nil {
+			log.Println("Error getting best rpc block number", err)
+		}
+	}()
+
+	// get blocks count and max block number from database
+	go func() {
+		defer wg.Done()
+
+		blocksQuery := "SELECT COUNT(*), MAX(block_number) FROM blocks WHERE chain_id = $1"
+		tokensQuery := "SELECT COUNT(*) FROM tokens WHERE chain_id = $1"
+		var blocksCount int64
+		var maxBlockNumber int64
+		err = w.db.Pool().QueryRow(ctx, blocksQuery, w.config.ChainID).Scan(&blocksCount, &maxBlockNumber)
+		if err != nil {
+			log.Println("Error getting blocks count", err)
+		} else {
+			status.IngestedBlocksCount = blocksCount
+			status.IngestedBlocksMaxBlockNumber = maxBlockNumber
+		}
+		var tokensCount int64
+		err = w.db.Pool().QueryRow(ctx, tokensQuery, w.config.ChainID).Scan(&tokensCount)
+		if err != nil {
+			log.Println("Error getting tokens count", err)
+		} else {
+
+			status.TokensCount = tokensCount
+		}
+
+	}()
+
+	wg.Wait()
+
+	status.IngestionLagBlocksCount = status.BestRpcBlockNumber - status.IngestedBlocksMaxBlockNumber
+	status.IngestionProgressPct = float64(status.IngestedBlocksCount) / float64(status.BestRpcBlockNumber-status.StartBlock) * 100
+
+	return status, nil
 
 }
