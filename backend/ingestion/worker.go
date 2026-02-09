@@ -84,9 +84,8 @@ func (w *NetworkWorker) populateAddressSet(ctx context.Context) error {
 		return err
 	}
 	for _, address := range addresses {
-		w.addressSet[hex.NormalizeAddress(address.Address)] = true
+		w.addressSet[hex.NormalizeAddress(address)] = true
 	}
-	log.Println("🔍 Watching", len(addresses), "addresses on", w.config.Name, "network")
 
 	return nil
 }
@@ -103,7 +102,6 @@ func (w *NetworkWorker) refreshAddressSet(ctx context.Context) error {
 				log.Println("error getting newly added addresses", err)
 				continue
 			}
-			log.Println("🔍 Found", len(addresses), "newly added addresses on", w.config.Name, "network")
 			for _, address := range addresses {
 				w.addressSet[hex.NormalizeAddress(address)] = true
 			}
@@ -284,28 +282,28 @@ func (w *NetworkWorker) getNewlyAddedAddresses(ctx context.Context) ([]string, e
 	return addresses, nil
 }
 
-func (w *NetworkWorker) getAllAddresses(ctx context.Context) ([]db.AddressRegistryEntity, error) {
-	rows, err := w.db.Pool().Query(ctx, "SELECT * FROM address_registry where chain_id = $1", w.config.ChainID)
+func (w *NetworkWorker) getAllAddresses(ctx context.Context) ([]string, error) {
+	rows, err := w.db.Pool().Query(ctx, "SELECT address FROM address_registry where chain_id = $1", w.config.ChainID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	entities := make([]db.AddressRegistryEntity, 0)
+	addresses := make([]string, 0)
 	for rows.Next() {
-		var entity db.AddressRegistryEntity
-		err := rows.Scan(&entity.Address, &entity.ChainID, &entity.EntityType, &entity.Label, &entity.CreatedAt)
+		var address string
+		err := rows.Scan(&address)
 		if err != nil {
 			return nil, err
 		}
-		entities = append(entities, entity)
+		addresses = append(addresses, address)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return entities, nil
+	return addresses, nil
 }
 
 func (w *NetworkWorker) fetchLastProcessedBlock(ctx context.Context) (int64, error) {
