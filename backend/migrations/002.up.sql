@@ -113,3 +113,9 @@ CREATE INDEX balance_snapshots_time_idx ON balance_snapshots (
     wallet_address,
     block_timestamp
 );
+
+--
+CREATE INDEX balance_snapshots_wallet_address_chain_id_id_desc_idx ON balance_snapshots (wallet_address, chain_id, id DESC);
+
+CREATE INDEX balance_snapshots_wallet_chain_asset_id_desc
+ON balance_snapshots (wallet_address, chain_id, asset_address, id DESC);
