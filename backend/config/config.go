@@ -12,10 +12,11 @@ type Config struct {
 }
 
 type WorkerConfig struct {
-	RetryDelayMs                  int   `json:"retryDelayMs"`
-	MaxDelayMs                    int   `json:"maxDelayMs"`
-	BalanceSnapshotIntervalBlocks int64 `json:"balanceSnapshotIntervalBlocks"` // at every N blocks we take a snapshot of the balances
-	BalanceSnapshotIntervalHours  int64 `json:"balanceSnapshotIntervalHours"`  // at every N hours we take a snapshot of the balances
+	RetryDelayMs                    int   `json:"retryDelayMs"`
+	MaxDelayMs                      int   `json:"maxDelayMs"`
+	BalanceSnapshotIntervalBlocks   int64 `json:"balanceSnapshotIntervalBlocks"`   // at every N blocks we take a snapshot of the balances
+	BalanceSnapshotIntervalHours    int64 `json:"balanceSnapshotIntervalHours"`    // at every N hours we take a snapshot of the balances
+	UpdateAddressSetIntervalSeconds int   `json:"updateAddressSetIntervalSeconds"` // at every N seconds we update the address set
 }
 
 type NetworkConfig struct {
@@ -42,8 +43,8 @@ type TokenMetadataConfig struct {
 }
 
 type ApiConfig struct {
-	Port string `json:"port"`
-	MaxResults int `json:"maxResults"`
+	Port       string `json:"port"`
+	MaxResults int    `json:"maxResults"`
 }
 
 type RPCRateLimitConfig struct {

@@ -78,15 +78,46 @@ func (w *NetworkWorker) syncTokenMetadata(ctx context.Context) error {
 
 }
 
-func (w *NetworkWorker) start(ctx context.Context) error {
-	log.Println("🔗 Started", w.config.Name, "ingestion worker")
+func (w *NetworkWorker) populateAddressSet(ctx context.Context) error {
 	addresses, err := w.getAllAddresses(ctx)
 	if err != nil {
 		return err
 	}
-
 	for _, address := range addresses {
 		w.addressSet[hex.NormalizeAddress(address.Address)] = true
+	}
+	log.Println("🔍 Watching", len(addresses), "addresses on", w.config.Name, "network")
+
+	return nil
+}
+
+func (w *NetworkWorker) refreshAddressSet(ctx context.Context) error {
+	interval := time.Second * time.Duration(w.config.SyncWorker.UpdateAddressSetIntervalSeconds)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(interval):
+			addresses, err := w.getNewlyAddedAddresses(ctx)
+			if err != nil {
+				log.Println("error getting newly added addresses", err)
+				continue
+			}
+			log.Println("🔍 Found", len(addresses), "newly added addresses on", w.config.Name, "network")
+			for _, address := range addresses {
+				w.addressSet[hex.NormalizeAddress(address)] = true
+			}
+		}
+	}
+}
+
+func (w *NetworkWorker) start(ctx context.Context) error {
+	log.Println("🔗 Started", w.config.Name, "ingestion worker")
+
+	err := w.populateAddressSet(ctx)
+
+	if err != nil {
+		return err
 	}
 
 	retryDelay := time.Duration(w.config.SyncWorker.RetryDelayMs) * time.Millisecond
@@ -102,6 +133,9 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 	// Read directly from the tokens table in batch and fetch the metadata for each token from the rpc,
 	// then update the token
 	go w.syncTokenMetadata(ctx)
+
+	// 3. refresh the address set every N seconds
+	go w.refreshAddressSet(ctx)
 
 	for {
 
@@ -220,6 +254,34 @@ func (w *NetworkWorker) takeBalanceSnapshot(ctx context.Context, block rpc.Block
 
 	log.Printf("✅ %s took balance snapshot at block %d", w.config.Name, blockNumber)
 	return nil
+}
+
+func (w *NetworkWorker) getNewlyAddedAddresses(ctx context.Context) ([]string, error) {
+
+	params := []interface{}{w.config.ChainID, w.config.SyncWorker.UpdateAddressSetIntervalSeconds}
+	query := "SELECT address FROM address_registry where chain_id = $1 and created_at > now() - ($2 * interval '1 second')"
+	rows, err := w.db.Pool().Query(ctx, query, params...)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	addresses := make([]string, 0)
+	for rows.Next() {
+		var address string
+		err := rows.Scan(&address)
+		if err != nil {
+			return nil, err
+		}
+		addresses = append(addresses, address)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return addresses, nil
 }
 
 func (w *NetworkWorker) getAllAddresses(ctx context.Context) ([]db.AddressRegistryEntity, error) {
