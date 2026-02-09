@@ -20,3 +20,7 @@ func FormatAddress(address string) string {
 func IsAddressEqual(address1 string, address2 string) bool {
 	return NormalizeAddress(address1) == NormalizeAddress(address2)
 }
+
+func IsValidAddressLength(address string) bool {
+	return len(address) >= 40
+}
