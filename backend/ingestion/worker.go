@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"polychain.capital/config"
 	"polychain.capital/db"
+	"polychain.capital/internal/hex"
 	"polychain.capital/rpc"
 )
 
@@ -85,7 +86,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 	}
 
 	for _, address := range addresses {
-		w.addressSet[normalizeAddress(address.Address)] = true
+		w.addressSet[hex.NormalizeAddress(address.Address)] = true
 	}
 
 	retryDelay := time.Duration(w.config.SyncWorker.RetryDelayMs) * time.Millisecond
@@ -113,7 +114,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 		)
 
 		bn, err := w.fetchLastProcessedBlock(ctx)
-		nextBlock := bn + 1
+		nextBlockNumber := bn + 1
 		if err != nil {
 			return err
 		}
@@ -130,7 +131,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 			}
 			b.Transactions = w.filterTransactions(b.Transactions)
 			block = b
-		}(nextBlock)
+		}(nextBlockNumber)
 
 		go func(blockNumber int64) {
 			defer wg.Done()
@@ -140,7 +141,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 				return
 			}
 			erc20TransferLogs = w.filterERC20TransferLogs(l)
-		}(nextBlock)
+		}(nextBlockNumber)
 
 		wg.Wait()
 
@@ -176,14 +177,44 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 			continue
 		}
 
-		if nextBlock%1000 == 0 {
-			log.Printf("✅ %s ingested up to block %d", w.config.Name, nextBlock)
+		if nextBlockNumber%w.config.SyncWorker.BalanceSnapshotIntervalBlocks == 0 {
+			// take a snapshot of the balances
+			err := w.takeBalanceSnapshot(ctx, block, nextBlockNumber)
+			if err != nil {
+				log.Println("error taking balance snapshot", err)
+			}
 		}
 
 		// reset retry delay
 		retryDelay = time.Duration(w.config.SyncWorker.RetryDelayMs) * time.Millisecond
 	}
 
+}
+
+func (w *NetworkWorker) takeBalanceSnapshot(ctx context.Context, block rpc.Block, blockNumber int64) error {
+
+	query := `INSERT INTO balance_snapshots (
+		chain_id, wallet_address, asset_type,
+		asset_address, balance_raw,
+		block_number, block_timestamp
+	) SELECT chain_id, wallet_address, asset_type, asset_address,
+		 	balance_raw, $1 as block_number, $2 as block_timestamp
+		 FROM balances
+	`
+
+	blockTimestamp, err := hex.DecodeTimestamp(block.Timestamp)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.db.Pool().Exec(ctx, query, block.Number, blockTimestamp)
+	if err != nil {
+		log.Println("error taking balance snapshot", err)
+		return err
+	}
+
+	log.Printf("✅ %s took balance snapshot at block %d", w.config.Name, blockNumber)
+	return nil
 }
 
 func (w *NetworkWorker) getAllAddresses(ctx context.Context) ([]db.AddressRegistryEntity, error) {
@@ -271,7 +302,7 @@ func (w *NetworkWorker) filterTransactions(transactions []rpc.Transaction) []rpc
 			continue
 		}
 
-		if w.addressSet[normalizeAddress(transaction.From)] || w.addressSet[normalizeAddress(transaction.To)] {
+		if w.addressSet[hex.NormalizeAddress(transaction.From)] || w.addressSet[hex.NormalizeAddress(transaction.To)] {
 			filteredTransactions = append(filteredTransactions, transaction)
 		}
 	}
@@ -284,14 +315,14 @@ func (w *NetworkWorker) filterERC20TransferLogs(logs []rpc.Log) []rpc.Log {
 	for _, l := range logs {
 		method := l.Topics[0]
 
-		if !isAddressEqual(method, w.config.ERC20TransferTopic) || len(l.Topics) != 3 {
+		if !hex.IsAddressEqual(method, w.config.ERC20TransferTopic) || len(l.Topics) != 3 {
 			continue
 		}
 
 		from := l.Topics[1]
 		to := l.Topics[2]
 
-		if w.addressSet[normalizeAddress(from)] || w.addressSet[normalizeAddress(to)] {
+		if w.addressSet[hex.NormalizeAddress(from)] || w.addressSet[hex.NormalizeAddress(to)] {
 			filteredLogs = append(filteredLogs, l)
 		}
 	}
@@ -331,12 +362,12 @@ func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, bl
 		return nil
 	}
 
-	blockNumber, err := hexToUint64(block.Number)
+	blockNumber, err := hex.DecodeUint64(block.Number)
 	if err != nil {
 		return err
 	}
 
-	blockTimestamp, err := hexToTimestamp(block.Timestamp)
+	blockTimestamp, err := hex.DecodeTimestamp(block.Timestamp)
 	if err != nil {
 		return err
 	}
@@ -352,8 +383,8 @@ func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, bl
 
 		values = append(values,
 			transaction.Hash, blockNumber, blockTimestamp,
-			normalizeAddress(transaction.From),
-			normalizeAddress(transaction.To),
+			hex.NormalizeAddress(transaction.From),
+			hex.NormalizeAddress(transaction.To),
 			transaction.Value, w.config.ChainID,
 		)
 		valuesPlaceholder = append(valuesPlaceholder, currentPlaceholder)
@@ -367,12 +398,12 @@ func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, bl
 }
 
 func (w *NetworkWorker) insertBlock(ctx context.Context, tx pgx.Tx, block rpc.Block) error {
-	blockNumber, err := hexToUint64(block.Number)
+	blockNumber, err := hex.DecodeUint64(block.Number)
 	if err != nil {
 		return err
 	}
 
-	blockTimestamp, err := hexToTimestamp(block.Timestamp)
+	blockTimestamp, err := hex.DecodeTimestamp(block.Timestamp)
 	if err != nil {
 		return err
 	}
@@ -389,13 +420,13 @@ func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, blo
 		return nil
 	}
 
-	blockNumber, err := hexToUint64(block.Number)
+	blockNumber, err := hex.DecodeUint64(block.Number)
 	if err != nil {
 
 		return err
 	}
 
-	blockTimestamp, err := hexToTimestamp(block.Timestamp)
+	blockTimestamp, err := hex.DecodeTimestamp(block.Timestamp)
 	if err != nil {
 		return err
 	}
@@ -409,7 +440,7 @@ func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, blo
 		currentPlaceholder := fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", counter+1, counter+2, counter+3, counter+4, counter+5, counter+6, counter+7, counter+8, counter+9)
 		counter += 9
 
-		logIndex, err := hexToUint64(l.LogIndex)
+		logIndex, err := hex.DecodeUint64(l.LogIndex)
 		if err != nil {
 			return err
 		}
@@ -417,9 +448,9 @@ func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, blo
 		values = append(values,
 			l.TxHash, logIndex,
 			blockNumber, blockTimestamp,
-			normalizeAddress(l.Topics[1]),
-			normalizeAddress(l.Topics[2]),
-			normalizeAddress(l.Address),
+			hex.NormalizeAddress(l.Topics[1]),
+			hex.NormalizeAddress(l.Topics[2]),
+			hex.NormalizeAddress(l.Address),
 			l.Data, w.config.ChainID)
 
 		valuesPlaceholder = append(valuesPlaceholder, currentPlaceholder)
@@ -557,7 +588,7 @@ func (w *NetworkWorker) fetchTokenMetadataDecimals(ctx context.Context, tokenAdd
 		return 0, err
 	}
 
-	d, err := decodeUint8(decimals)
+	d, err := hex.DecodeUint8(decimals)
 	if err != nil {
 		return 0, err
 	}
@@ -585,7 +616,7 @@ func (w *NetworkWorker) fetchTokenMetadataName(ctx context.Context, tokenAddress
 		return "", err
 	}
 
-	return decodeStringOrBytes32(name)
+	return hex.DecodeStringOrBytes32(name)
 }
 
 func (w *NetworkWorker) fetchTokenMetadataSymbol(ctx context.Context, tokenAddress string) (string, error) {
@@ -609,13 +640,13 @@ func (w *NetworkWorker) fetchTokenMetadataSymbol(ctx context.Context, tokenAddre
 		return "", err
 	}
 
-	return decodeStringOrBytes32(symbol)
+	return hex.DecodeStringOrBytes32(symbol)
 }
 
 func (w *NetworkWorker) fetchTokenMetadata(ctx context.Context, entity db.TokenEntity) (*TokenMetadata, error) {
 
 	meta := &TokenMetadata{}
-	tokenAddress := formatAddress(entity.TokenAddress)
+	tokenAddress := hex.FormatAddress(entity.TokenAddress)
 
 	// decimals (most important)
 	decimals, err := w.fetchTokenMetadataDecimals(ctx, tokenAddress)
@@ -702,7 +733,7 @@ func (w *NetworkWorker) getBestRpcBlockNumber(ctx context.Context) (int64, error
 		return 0, err
 	}
 
-	val, err := hexToUint64(blockNumber)
+	val, err := hex.DecodeUint64(blockNumber)
 
 	if err != nil {
 		return 0, err
