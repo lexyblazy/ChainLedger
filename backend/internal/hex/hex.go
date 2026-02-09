@@ -1,4 +1,4 @@
-package ingestion
+package hex
 
 import (
 	"bytes"
@@ -11,13 +11,13 @@ import (
 	"time"
 )
 
-func hexToUint64(s string) (uint64, error) {
+func DecodeUint64(s string) (uint64, error) {
 	v := strings.TrimPrefix(s, "0x")
 	return strconv.ParseUint(v, 16, 64)
 
 }
 
-func hexToBigInt(s string) (*big.Int, error) {
+func DecodeBigInt(s string) (*big.Int, error) {
 	v := strings.TrimPrefix(s, "0x")
 	if v == "" {
 		return big.NewInt(0), nil
@@ -32,34 +32,17 @@ func hexToBigInt(s string) (*big.Int, error) {
 	return n, nil
 }
 
-func normalizeAddress(addr string) string {
-	a := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(addr), "0x"))
 
-	if len(a) == 64 {
-		// topic-padded address: take last 20 bytes (40 hex chars)
-		a = a[24:]
-	}
 
-	return a
-}
-
-func formatAddress(address string) string {
-	return "0x" + normalizeAddress(address)
-}
-
-func isAddressEqual(address1 string, address2 string) bool {
-	return normalizeAddress(address1) == normalizeAddress(address2)
-}
-
-func hexToTimestamp(s string) (time.Time, error) {
-	uint64, err := hexToUint64(s)
+func DecodeTimestamp(s string) (time.Time, error) {
+	uint64, err := DecodeUint64(s)
 	if err != nil {
 		return time.Time{}, err
 	}
 	return time.Unix(int64(uint64), 0).UTC(), nil
 }
 
-func decodeUint8(hexData string) (uint8, error) {
+func DecodeUint8(hexData string) (uint8, error) {
 	hexData = strings.TrimSpace(hexData)
 	hexData = strings.TrimPrefix(hexData, "0x")
 	hexData = strings.TrimPrefix(hexData, "0X")
@@ -80,7 +63,7 @@ func decodeUint8(hexData string) (uint8, error) {
 	return uint8(b[31]), nil
 }
 
-func decodeStringOrBytes32(hexData string) (string, error) {
+func DecodeStringOrBytes32(hexData string) (string, error) {
 	hexData = strings.TrimSpace(hexData)
 	hexData = strings.TrimPrefix(hexData, "0x")
 
