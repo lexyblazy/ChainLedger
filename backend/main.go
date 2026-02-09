@@ -29,8 +29,8 @@ func main() {
 	}
 	defer db.Close()
 
-	server := server.NewServer(config.Api.Port)
 	ingestion := ingestion.New(db, config)
+	server := server.New(db, config, ingestion)
 
 	// Start the server in a goroutine
 	go func(c context.Context) {
