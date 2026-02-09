@@ -29,6 +29,7 @@ func (s *Server) jsonHandler(fn func(r *http.Request) (any, error)) http.Handler
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Println("error in jsonHandler", r.URL.Path, err)
 			return
 		}
 
@@ -45,6 +46,9 @@ func (s *Server) SetupRoutes(router *http.ServeMux) {
 	router.HandleFunc("/status", s.jsonHandler(s.getStatus))
 	router.HandleFunc("/wallets", s.jsonHandler(s.getWallets))
 	router.HandleFunc("/tokens", s.jsonHandler(s.getTokens))
+
+	// router.HandleFunc("/wallets/{address}/balances", s.jsonHandler(s.getWalletBalances))
+	router.HandleFunc("/wallets/{address}/balance-snapshots", s.jsonHandler(s.getWalletBalanceSnapshots))
 }
 
 func (s *Server) Start(ctx context.Context) {
