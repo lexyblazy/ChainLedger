@@ -7,7 +7,7 @@ type AddressRegistryEntity struct {
 	ChainID    int64     `json:"chain_id"`
 	EntityType string    `json:"entity_type"`
 	Label      string    `json:"label"`
-	CreatedAt  time.Time `json:"created_at"`
+	CreatedAt  time.Time `json:"-"`
 }
 
 type TokenEntity struct {
@@ -16,8 +16,8 @@ type TokenEntity struct {
 	Symbol                *string    `json:"symbol"`                   // nullable
 	Name                  *string    `json:"name"`                     // nullable
 	Decimals              *int8      `json:"decimals"`                 // nullable
-	FirstSeenBlock        int64      `json:"first_seen_block"`         // required
-	MetadataFetchFailedAt *time.Time `json:"metadata_fetch_failed_at"` // nullable
-	CreatedAt             time.Time  `json:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at"`
+	FirstSeenBlock        int64      `json:"-"`         // required
+	MetadataFetchFailedAt *time.Time `json:"-"` // nullable
+	CreatedAt             time.Time  `json:"-"`	
+	UpdatedAt             time.Time  `json:"-"`
 }

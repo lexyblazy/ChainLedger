@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -21,13 +22,29 @@ func New(db *db.DB, config *config.Config, i *ingestion.IngestionService) *Serve
 	return &Server{port: config.Api.Port, db: db, config: config, i: i}
 }
 
+func (s *Server) jsonHandler(fn func(r *http.Request) (any, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		data, err := fn(r)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(data)
+	}
+}
+
 func (s *Server) SetupRoutes(router *http.ServeMux) {
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Hello, World!"))
 	})
 
-	router.HandleFunc("/status", s.status)
+	router.HandleFunc("/status", s.jsonHandler(s.getStatus))
+	router.HandleFunc("/wallets", s.jsonHandler(s.getWallets))
+	router.HandleFunc("/tokens", s.jsonHandler(s.getTokens))
 }
 
 func (s *Server) Start(ctx context.Context) {
