@@ -22,6 +22,13 @@ type GetWalletsResponse struct {
 	} `json:"meta"`
 }
 
+type CreateWalletRequestBody struct {
+	Address    string  `json:"address"`
+	ChainID    int     `json:"chain_id"`
+	EntityType *string `json:"entity_type"`
+	Label      *string `json:"label"`
+}
+
 type GetTokensResponse struct {
 	Data struct {
 		Tokens []db.TokenEntity `json:"tokens"`
@@ -55,8 +62,10 @@ type GetWalletBalanceResponse struct {
 	} `json:"meta"`
 }
 
-
-
 type ErrorResponse struct {
 	Error string `json:"error"`
+}
+
+type SuccessResponse struct {
+	Success bool `json:"success"`
 }

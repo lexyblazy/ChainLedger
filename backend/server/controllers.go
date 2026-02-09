@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -46,7 +48,45 @@ func (s *Server) getStatus(r *http.Request) (any, int, error) {
 	return response, http.StatusOK, nil
 }
 
-func (s *Server) getWallets(r *http.Request) (any, int, error) {
+func (s *Server) createWallet(r *http.Request) (any, int, error) {
+
+	var body CreateWalletRequestBody
+	err := json.NewDecoder(r.Body).Decode(&body)
+
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	if body.Address == "" || !hex.IsValidAddressLength(body.Address) {
+		return nil, http.StatusBadRequest, errors.New("address is required and must be a valid address")
+	}
+
+	networkConfig := s.config.Networks[strconv.Itoa(body.ChainID)]
+	if networkConfig.Name == "" {
+		return nil, http.StatusBadRequest, errors.New("chain_id is not supported")
+	}
+
+	query := `INSERT INTO address_registry (address, chain_id, entity_type, label)
+	 VALUES ($1, $2, $3, $4) ON CONFLICT (address, chain_id)
+	 DO UPDATE SET entity_type = $3, label = $4, updated_at = now()`
+
+	_, err = s.db.Pool().Exec(r.Context(), query, hex.NormalizeAddress(body.Address), body.ChainID, body.EntityType, body.Label)
+
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	return &SuccessResponse{
+		Success: true,
+	}, http.StatusOK, nil
+}
+
+func (s *Server) handleWallets(r *http.Request) (any, int, error) {
+
+	if r.Method == http.MethodPost {
+		return s.createWallet(r)
+	}
+
 	limit, offset, err := s.getOffsetPaginationParams(r)
 	if err != nil {
 		return nil, http.StatusBadRequest, err

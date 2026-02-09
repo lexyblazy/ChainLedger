@@ -32,9 +32,9 @@ func (s *Server) jsonHandler(fn func(r *http.Request) (any, int, error)) http.Ha
 		if err != nil {
 			var errorResponse ErrorResponse
 			errorResponse.Error = err.Error()
-			log.Println("error in jsonHandler", r.URL.Path, err, "Status Code:", statusCode)
+			log.Println("Route Handler Error:", r.Method, r.URL.Path, err, "Status Code:", statusCode)
 			json.NewEncoder(w).Encode(errorResponse)
-			
+
 			return
 		}
 
@@ -49,7 +49,7 @@ func (s *Server) SetupRoutes(router *http.ServeMux) {
 	})
 
 	router.HandleFunc("/status", s.jsonHandler(s.getStatus))
-	router.HandleFunc("/wallets", s.jsonHandler(s.getWallets))
+	router.HandleFunc("/wallets", s.jsonHandler(s.handleWallets))
 	router.HandleFunc("/tokens", s.jsonHandler(s.getTokens))
 
 	router.HandleFunc("/wallets/{address}/balance", s.jsonHandler(s.getWalletBalance))
