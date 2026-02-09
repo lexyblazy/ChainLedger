@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -35,22 +34,25 @@ func (s *Server) getCursorPaginationParams(r *http.Request, cursorName string) (
 	return limit, r.URL.Query().Get(cursorName)
 }
 
-func (s *Server) getStatus(r *http.Request) (any, error) {
+func (s *Server) getStatus(r *http.Request) (any, int, error) {
 	networkStatuses, err := s.i.GetStatus(r.Context())
 	var response GetStatusResponse
 	response.Data.Networks = networkStatuses
 
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 
-	return response, nil
+	return response, http.StatusOK, nil
 }
 
-func (s *Server) getWallets(r *http.Request) (any, error) {
+func (s *Server) getWallets(r *http.Request) (any, int, error) {
 	limit, offset, err := s.getOffsetPaginationParams(r)
-	chainID := r.URL.Query().Get("chain_id")
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
 
+	chainID := r.URL.Query().Get("chain_id")
 	var response GetWalletsResponse
 
 	query := `SELECT address, chain_id, entity_type, label FROM address_registry`
@@ -65,8 +67,7 @@ func (s *Server) getWallets(r *http.Request) (any, error) {
 
 	rows, err := s.db.Pool().Query(r.Context(), query, params...)
 	if err != nil {
-		log.Println("error getting wallets", err)
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 	defer rows.Close()
 
@@ -76,46 +77,53 @@ func (s *Server) getWallets(r *http.Request) (any, error) {
 		var wallet db.AddressRegistryEntity
 		err := rows.Scan(&wallet.Address, &wallet.ChainID, &wallet.EntityType, &wallet.Label)
 		if err != nil {
-			return nil, err
+			return nil, http.StatusInternalServerError, err
 		}
 		wallet.Address = hex.FormatAddress(wallet.Address)
 		wallets = append(wallets, wallet)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 
 	response.Data.Wallets = wallets
 	response.Meta.Offset = offset
 	response.Meta.Limit = limit
 
-	return response, nil
+	return response, http.StatusOK, nil
 }
 
-func (s *Server) getTokens(r *http.Request) (any, error) {
+func (s *Server) getTokens(r *http.Request) (any, int, error) {
 	limit, offset, err := s.getOffsetPaginationParams(r)
-	var response GetTokensResponse
 
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
+
+	var response GetTokensResponse
 
 	query := `SELECT chain_id, token_address, symbol, name, decimals FROM tokens`
 	params := []interface{}{limit, offset}
 
-	chainID := r.URL.Query().Get("chain_id")
-	if chainID != "" {
+	chainIdStr := r.URL.Query().Get("chain_id")
+	if chainIdStr != "" {
+		chainId, err := strconv.Atoi(chainIdStr)
+		if err != nil {
+			return nil, http.StatusBadRequest, err
+		}
 		query += fmt.Sprintf(" WHERE chain_id = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, chainID)
+		params = append(params, chainId)
 	}
+
 	query += ` order by first_seen_block asc LIMIT $1 OFFSET $2`
 
 	rows, err := s.db.Pool().Query(r.Context(), query, params...)
+
 	if err != nil {
-		log.Println("error getting tokens", err)
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
+
 	defer rows.Close()
 
 	tokens := make([]db.TokenEntity, 0)
@@ -124,24 +132,88 @@ func (s *Server) getTokens(r *http.Request) (any, error) {
 		var token db.TokenEntity
 		err := rows.Scan(&token.ChainID, &token.TokenAddress, &token.Symbol, &token.Name, &token.Decimals)
 		if err != nil {
-			return nil, err
+			return nil, http.StatusInternalServerError, err
 		}
 		token.TokenAddress = hex.FormatAddress(token.TokenAddress)
 		tokens = append(tokens, token)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 
 	response.Data.Tokens = tokens
 	response.Meta.Offset = offset
 	response.Meta.Limit = limit
 
-	return response, nil
+	return response, http.StatusOK, nil
 }
 
-func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, error) {
+func (s *Server) getWalletBalance(r *http.Request) (any, int, error) {
+	var response GetWalletBalanceResponse
+	limit, offset, err := s.getOffsetPaginationParams(r)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	address := r.PathValue("address")
+	tokenAddress := r.URL.Query().Get("token_address")
+	params := []interface{}{hex.NormalizeAddress(address), limit, offset}
+	query := `SELECT chain_id, wallet_address, asset_type, asset_address, balance_raw FROM balances WHERE wallet_address = $1`
+
+	chainIdStr := r.URL.Query().Get("chain_id")
+	if chainIdStr != "" {
+		chainId, err := strconv.Atoi(chainIdStr)
+		if err != nil {
+			return nil, http.StatusBadRequest, err
+		}
+
+		query += fmt.Sprintf(" AND chain_id = %s", fmt.Sprintf("$%d", len(params)+1))
+		params = append(params, chainId)
+	}
+
+	if hex.IsValidAddressLength(tokenAddress) {
+		query += fmt.Sprintf(" AND asset_address = %s", fmt.Sprintf("$%d", len(params)+1))
+		params = append(params, hex.NormalizeAddress(tokenAddress))
+	} else if tokenAddress == "null" {
+		query += " AND asset_address is null"
+	}
+
+	query += " ORDER BY asset_type,asset_address DESC LIMIT $2 OFFSET $3"
+
+	rows, err := s.db.Pool().Query(r.Context(), query, params...)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	defer rows.Close()
+
+	balances := make([]db.BalanceEntity, 0)
+	for rows.Next() {
+		var balance db.BalanceEntity
+		err := rows.Scan(&balance.ChainID, &balance.WalletAddress, &balance.AssetType, &balance.AssetAddress, &balance.BalanceRaw)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+		balance.WalletAddress = hex.FormatAddress(balance.WalletAddress)
+		if balance.AssetAddress != nil {
+			formattedAddress := hex.FormatAddress(*balance.AssetAddress)
+			balance.AssetAddress = &formattedAddress
+		}
+		balances = append(balances, balance)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	response.Data.Balance = balances
+	response.Meta.Offset = offset
+	response.Meta.Limit = limit
+
+	return response, http.StatusOK, nil
+}
+
+func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 
 	var response GetWalletBalanceSnapshotsResponse
 	address := r.PathValue("address")
@@ -178,7 +250,7 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, error) {
 
 	rows, err := s.db.Pool().Query(r.Context(), query, params...)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 	defer rows.Close()
 
@@ -187,7 +259,7 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, error) {
 		var balanceSnapshot db.BalanceSnapshotEntity
 		err := rows.Scan(&balanceSnapshot.ID, &balanceSnapshot.ChainID, &balanceSnapshot.WalletAddress, &balanceSnapshot.AssetType, &balanceSnapshot.AssetAddress, &balanceSnapshot.BalanceRaw, &balanceSnapshot.BlockNumber, &balanceSnapshot.BlockTimestamp)
 		if err != nil {
-			return nil, err
+			return nil, http.StatusInternalServerError, err
 		}
 		balanceSnapshot.WalletAddress = hex.FormatAddress(balanceSnapshot.WalletAddress)
 		if balanceSnapshot.AssetAddress != nil {
@@ -198,12 +270,12 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 
 	response.Data.BalanceSnapshots = balanceSnapshots
 	response.Meta.CursorId = balanceSnapshots[len(balanceSnapshots)-1].ID
 	response.Meta.Limit = limit
 
-	return response, nil
+	return response, http.StatusOK, nil
 }

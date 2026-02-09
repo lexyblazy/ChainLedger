@@ -43,3 +43,20 @@ type GetWalletBalanceSnapshotsResponse struct {
 		Limit    int   `json:"limit"`
 	} `json:"meta"`
 }
+
+type GetWalletBalanceResponse struct {
+	Data struct {
+		Balance []db.BalanceEntity `json:"balance"`
+	} `json:"data"`
+
+	Meta struct {
+		Offset int `json:"offset"`
+		Limit  int `json:"limit"`
+	} `json:"meta"`
+}
+
+
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}

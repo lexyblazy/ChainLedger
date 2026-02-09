@@ -33,3 +33,15 @@ type BalanceSnapshotEntity struct {
 	BlockTimestamp time.Time `json:"block_timestamp"`
 	CreatedAt      time.Time `json:"-"`
 }
+
+// This is a view and not a table
+type BalanceEntity struct {
+	ID            int64     `json:"id"`
+	ChainID       int64     `json:"chain_id"`
+	WalletAddress string    `json:"wallet_address"`
+	AssetType     string    `json:"asset_type"`
+	AssetAddress  *string   `json:"asset_address"` // nullable
+	BalanceRaw    string    `json:"balance_raw"`
+	CreatedAt     time.Time `json:"-"`
+	UpdatedAt     time.Time `json:"-"`
+}

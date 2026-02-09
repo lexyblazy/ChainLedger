@@ -22,14 +22,19 @@ func New(db *db.DB, config *config.Config, i *ingestion.IngestionService) *Serve
 	return &Server{port: config.Api.Port, db: db, config: config, i: i}
 }
 
-func (s *Server) jsonHandler(fn func(r *http.Request) (any, error)) http.HandlerFunc {
+func (s *Server) jsonHandler(fn func(r *http.Request) (any, int, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		data, err := fn(r)
+		data, statusCode, err := fn(r)
+
+		w.WriteHeader(statusCode)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Println("error in jsonHandler", r.URL.Path, err)
+			var errorResponse ErrorResponse
+			errorResponse.Error = err.Error()
+			log.Println("error in jsonHandler", r.URL.Path, err, "Status Code:", statusCode)
+			json.NewEncoder(w).Encode(errorResponse)
+			
 			return
 		}
 
@@ -47,7 +52,7 @@ func (s *Server) SetupRoutes(router *http.ServeMux) {
 	router.HandleFunc("/wallets", s.jsonHandler(s.getWallets))
 	router.HandleFunc("/tokens", s.jsonHandler(s.getTokens))
 
-	// router.HandleFunc("/wallets/{address}/balances", s.jsonHandler(s.getWalletBalances))
+	router.HandleFunc("/wallets/{address}/balance", s.jsonHandler(s.getWalletBalance))
 	router.HandleFunc("/wallets/{address}/balance-snapshots", s.jsonHandler(s.getWalletBalanceSnapshots))
 }
 
