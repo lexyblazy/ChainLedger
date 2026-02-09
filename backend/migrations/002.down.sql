@@ -1,5 +1,5 @@
 drop table if exists balance_snapshots;
-drop view if exists balances;
+drop table if exists balances;
 drop view if exists asset_flows;
 
 drop index if exists erc20_transfers_chain_id_token_address_from_address;

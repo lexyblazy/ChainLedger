@@ -14,7 +14,8 @@ SELECT
   nt.from_address AS wallet_address,
   'native'      AS asset_type,
   NULL          AS asset_address,
-  -nt.amount_raw   AS amount_raw
+  -nt.amount_raw   AS amount_raw,
+  nt.block_number as block_number
 FROM native_transfers nt
 JOIN address_registry ar 
     ON ar.address = nt.from_address 
@@ -28,7 +29,8 @@ SELECT
   nt.to_address   AS wallet_address,
   'native'     AS asset_type,
   NULL         AS asset_address,
-  nt.amount_raw   AS amount_raw
+  nt.amount_raw   AS amount_raw,
+  nt.block_number as block_number
 FROM native_transfers nt
 JOIN address_registry ar 
     ON ar.address = nt.to_address 
@@ -42,7 +44,8 @@ SELECT
   et.from_address AS wallet_address,
   'erc20'      AS asset_type,
   et.token_address AS asset_address,
-  -et.amount_raw  AS amount_raw
+  -et.amount_raw  AS amount_raw,
+  et.block_number as block_number
 FROM erc20_transfers et
 JOIN address_registry ar 
     ON ar.address = et.from_address 
@@ -56,23 +59,26 @@ SELECT
   et.to_address   AS wallet_address,
   'erc20'      AS asset_type,
   et.token_address AS asset_address,
-  et.amount_raw   AS amount_raw
+  et.amount_raw   AS amount_raw,
+  et.block_number as block_number
 FROM erc20_transfers et
 JOIN address_registry ar 
     ON ar.address = et.to_address 
     AND ar.chain_id = et.chain_id
 ;
 
---  balances
-CREATE VIEW balances AS
-SELECT
-  chain_id,
-  wallet_address,
-  asset_type,
-  asset_address,
-  SUM(amount_raw) AS balance_raw
-FROM asset_flows 
-GROUP BY chain_id, wallet_address, asset_type, asset_address;
+-- balances table
+CREATE TABLE balances (
+    id                  SERIAL PRIMARY KEY,
+    chain_id            BIGINT NOT NULL,
+    wallet_address      TEXT   NOT NULL,
+    asset_type          TEXT   NOT NULL,
+    asset_address       TEXT,  -- NULL for native assets
+    balance_raw         NUMERIC(78, 0) NOT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (wallet_address, chain_id,asset_type, asset_address)
+)
 
 CREATE TABLE balance_snapshots (
     id                  SERIAL PRIMARY KEY,
