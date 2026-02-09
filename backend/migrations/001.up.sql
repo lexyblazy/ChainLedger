@@ -1,12 +1,13 @@
 -- Address Registry
 CREATE TABLE address_registry (
-    address         TEXT PRIMARY KEY,
+    address         TEXT NOT NULL,
     chain_id        INTEGER NOT NULL,
-    entity_type     TEXT NOT NULL CHECK (
-        entity_type IN ('fund', 'vesting_contract', 'counterparty', 'protocol')
-    ),
-    label           TEXT NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    entity_type     TEXT,
+    label           TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at		TIMESTAMPTZ NOT NULL DEFAULT now(),
+    
+    primary key (chain_id,address)
 );
 
 CREATE INDEX idx_address_registry_chain_id ON address_registry (chain_id);
