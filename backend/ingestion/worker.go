@@ -179,7 +179,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 
 		if nextBlockNumber%w.config.SyncWorker.BalanceSnapshotIntervalBlocks == 0 {
 			// take a snapshot of the balances
-			err := w.takeBalanceSnapshot(ctx, block, nextBlockNumber)
+			err := w.takeBalanceSnapshot(ctx, block)
 			if err != nil {
 				log.Println("error taking balance snapshot", err)
 			}
@@ -191,7 +191,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 
 }
 
-func (w *NetworkWorker) takeBalanceSnapshot(ctx context.Context, block rpc.Block, blockNumber int64) error {
+func (w *NetworkWorker) takeBalanceSnapshot(ctx context.Context, block rpc.Block) error {
 
 	query := `INSERT INTO balance_snapshots (
 		chain_id, wallet_address, asset_type,
@@ -201,6 +201,11 @@ func (w *NetworkWorker) takeBalanceSnapshot(ctx context.Context, block rpc.Block
 		 	balance_raw, $1 as block_number, $2 as block_timestamp
 		 FROM balances
 	`
+
+	blockNumber, err := hex.DecodeUint64(block.Number)
+	if err != nil {
+		return err
+	}
 
 	blockTimestamp, err := hex.DecodeTimestamp(block.Timestamp)
 	if err != nil {
@@ -352,8 +357,53 @@ func (w *NetworkWorker) commitBlock(ctx context.Context, block rpc.Block, erc20T
 			return err
 		}
 
+		err = w.updateBalances(ctx, tx, block)
+
 		return nil
 	})
+}
+
+func (w *NetworkWorker) updateBalances(ctx context.Context, tx pgx.Tx, block rpc.Block) error {
+	query := `
+INSERT INTO balances (
+    wallet_address,
+    chain_id,
+    asset_type,
+    asset_address,
+    balance_raw
+)
+SELECT
+    wallet_address,
+    chain_id,
+    asset_type,
+    asset_address,
+    SUM(amount_raw) AS delta
+FROM asset_flows
+WHERE block_number = $1
+GROUP BY
+    wallet_address,
+    chain_id,
+    asset_type,
+    asset_address
+ON CONFLICT (wallet_address, chain_id, asset_type, asset_address)
+DO UPDATE
+SET
+    balance_raw = balances.balance_raw + EXCLUDED.balance_raw,
+    updated_at = now();
+
+	`
+	blockNumber, err := hex.DecodeUint64(block.Number)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, query, blockNumber)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, block rpc.Block) error {
@@ -460,10 +510,6 @@ func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, blo
 	_, err = tx.Exec(ctx, query, values...)
 
 	return err
-}
-
-func (w *NetworkWorker) fetchBatchTokenMetadata(ctx context.Context, tokenAddresses []string) {
-
 }
 
 func (w *NetworkWorker) syncDiscoveredTokensInBatch(ctx context.Context) error {
