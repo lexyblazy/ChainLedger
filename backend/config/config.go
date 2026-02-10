@@ -17,6 +17,8 @@ type WorkerConfig struct {
 	BalanceSnapshotIntervalBlocks   int64 `json:"balanceSnapshotIntervalBlocks"`   // at every N blocks we take a snapshot of the balances
 	BalanceSnapshotIntervalHours    int64 `json:"balanceSnapshotIntervalHours"`    // at every N hours we take a snapshot of the balances
 	UpdateAddressSetIntervalSeconds int   `json:"updateAddressSetIntervalSeconds"` // at every N seconds we update the address set
+	BlockGap                        int64 `json:"blockGap"`                        // Gap between the bestRpcBlock and the current block we are processing.
+	BestRpcBlockPollIntervalSeconds int   `json:"bestRpcBlockPollIntervalSeconds"` // Throttle the polling of the best rpc block to ensure sufficient gap between the rpc calls
 }
 
 type NetworkConfig struct {

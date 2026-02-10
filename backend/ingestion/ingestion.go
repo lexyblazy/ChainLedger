@@ -47,7 +47,7 @@ func (s *IngestionService) Start(ctx context.Context) error {
 
 	for _, nw := range s.nw {
 		go func(nw *NetworkWorker) {
-			log.Println("⌛️ Starting", nw.config.Name, "ingestion worker")
+			log.Println("⌛️ Starting", nw.config.Name, "ingestion workflow")
 			err := nw.start(ctx)
 			if err != nil {
 				s.WorkerErrors[nw.config.ChainID] <- err
