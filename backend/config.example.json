@@ -1,0 +1,86 @@
+{
+  "networks": {
+    "1": {
+      "name": "Ethereum Mainnet",
+      "startBlock": 21525890,
+      "rpcURL": "<YOUR_RPC_URL_HERE>",
+      "chainId": 1,
+      "decimals": 18,
+      "symbol": "ETH",
+      "rpcRateLimit": {
+        "rps": 20,
+        "burst": 20,
+        "maxRetryCount": 3,
+        "retryDelayMs": 1000
+      },
+      "syncWorker": {
+        "retryDelayMs": 1000,
+        "maxDelayMs": 30000,
+        "balanceSnapshotIntervalBlocks": 1000,
+        "balanceSnapshotIntervalHours": 24,
+        "updateAddressSetIntervalSeconds": 60,
+        "blockGap": 500,
+        "bestRpcBlockPollIntervalSeconds": 10
+      },
+      "erc20TransferTopic": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+      "tokenDiscoveryBatchSize": 150,
+      "tokenMetadata": {
+        "dbBatchSize": 50,
+        "rpcBatchSize": 5,
+        "failedIntervalHours": 2,
+        "rpcCalls": {
+          "decimals": "0x313ce567",
+          "name": "0x06fdde03",
+          "symbol": "0x95d89b41"
+        },
+        "discoveryIntervalSeconds": 30,
+        "metadataFetchIntervalSeconds": 120
+      }
+    },
+    "8453": {
+      "name": "Base Mainnet",
+      "startBlock": 41966223,
+      "rpcURL": "<YOUR_RPC_URL_HERE>",
+      "chainId": 8453,
+      "decimals": 18,
+      "symbol": "ETH",
+      "rpcRateLimit": {
+        "rps": 20,
+        "burst": 10,
+        "maxRetryCount": 3,
+        "retryDelayMs": 1000
+      },
+      "syncWorker": {
+        "retryDelayMs": 1000,
+        "maxDelayMs": 30000,
+        "balanceSnapshotIntervalBlocks": 1000,
+        "balanceSnapshotIntervalHours": 24,
+        "updateAddressSetIntervalSeconds": 60,
+        "blockGap": 500,
+        "bestRpcBlockPollIntervalSeconds": 10
+      },
+      "erc20TransferTopic": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+      "tokenDiscoveryBatchSize": 150,
+      "tokenMetadata": {
+        "dbBatchSize": 50,
+        "rpcBatchSize": 5,
+        "failedIntervalHours": 2,
+        "rpcCalls": {
+          "decimals": "0x313ce567",
+          "name": "0x06fdde03",
+          "symbol": "0x95d89b41"
+        },
+        "discoveryIntervalSeconds": 30,
+        "metadataFetchIntervalSeconds": 120
+      }
+    }
+  },
+  "databaseURL": "<YOUR_DATABASE_URL_HERE>",
+
+  "api": {
+    "port": "<YOUR_API_PORT_HERE>",
+    "maxResults": "<MAX_RESULTS_COUNT_HERE>"
+  },
+
+  "shutdownTimeoutSeconds": 120
+}
