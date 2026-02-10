@@ -402,22 +402,30 @@ func (w *NetworkWorker) commitBlock(ctx context.Context, block rpc.Block, erc20T
 
 		err = w.insertBlock(ctx, tx, block)
 		if err != nil {
+			log.Println("error inserting block", err)
 			return err
 		}
 
 		err = w.insertNativeTransfers(ctx, tx, block)
 
 		if err != nil {
+			log.Println("error inserting native transfers", err)
 			return err
 		}
 
 		err = w.insertERC20Transfers(ctx, tx, block, erc20TransferLogs)
 
 		if err != nil {
+			log.Println("error inserting erc20 transfers", err)
 			return err
 		}
 
 		err = w.updateBalances(ctx, tx, block)
+
+		if err != nil {
+			log.Println("error updating balances", err)
+			return err
+		}
 
 		return nil
 	})
@@ -436,7 +444,7 @@ SELECT
     wallet_address,
     chain_id,
     asset_type,
-    asset_address,
+    COALESCE(asset_address, 'native') as asset_address,
     SUM(amount_raw) AS delta
 FROM asset_flows
 WHERE block_number = $1

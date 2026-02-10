@@ -67,42 +67,44 @@ JOIN address_registry ar
     AND ar.chain_id = et.chain_id
 ;
 
--- balances table
+-- Balances table
 CREATE TABLE balances (
-    id                  SERIAL PRIMARY KEY,
     chain_id            BIGINT NOT NULL,
     wallet_address      TEXT   NOT NULL,
     asset_type          TEXT   NOT NULL,
-    asset_address       TEXT,  -- NULL for native assets
+    asset_address       TEXT   NOT NULL,
     balance_raw         NUMERIC(78, 0) NOT NULL,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (wallet_address, chain_id,asset_type, asset_address)
+
+    PRIMARY KEY (chain_id, wallet_address, asset_type, asset_address)
 )
 
+-- Balance snapshots
 CREATE TABLE balance_snapshots (
     id                  SERIAL PRIMARY KEY,
     chain_id            BIGINT NOT NULL,
     wallet_address      TEXT   NOT NULL,
 
     asset_type          TEXT   NOT NULL,
-    asset_address       TEXT,  -- NULL for native assets
+    asset_address       TEXT   NOT NULL,
 
     balance_raw         NUMERIC(78, 0) NOT NULL,
 
-    block_number      BIGINT NOT NULL,
-    block_timestamp  TIMESTAMPTZ NOT NULL,
+    block_number        BIGINT NOT NULL,
+    block_timestamp     TIMESTAMPTZ NOT NULL,
 
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 
-   UNIQUE (
+);
+
+CREATE UNIQUE INDEX balance_snapshot_unique_idx ON balance_snapshots (
         chain_id,
         wallet_address,
         asset_type,
         asset_address,
         block_number
     )
-);
 
 -- Latest snapshot per address / asset
 CREATE INDEX balance_snapshots_latest_idx ON balance_snapshots (
