@@ -51,17 +51,6 @@ type GetWalletBalanceSnapshotsResponse struct {
 	} `json:"meta"`
 }
 
-type GetWalletBalanceResponse struct {
-	Data struct {
-		Balance []db.BalanceEntity `json:"balance"`
-	} `json:"data"`
-
-	Meta struct {
-		Offset int `json:"offset"`
-		Limit  int `json:"limit"`
-	} `json:"meta"`
-}
-
 type WalletPortfolio struct {
 	AssetType    string  `json:"asset_type"`
 	AssetAddress string  `json:"asset_address"`

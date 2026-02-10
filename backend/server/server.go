@@ -43,18 +43,19 @@ func (s *Server) jsonHandler(fn func(r *http.Request) (any, int, error)) http.Ha
 }
 
 func (s *Server) SetupRoutes(router *http.ServeMux) {
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello, World!"))
-	})
 
 	router.HandleFunc("/status", s.jsonHandler(s.getStatus))
 	router.HandleFunc("/wallets", s.jsonHandler(s.handleWallets))
 	router.HandleFunc("/tokens", s.jsonHandler(s.getTokens))
 
-	router.HandleFunc("/wallets/{address}/balance", s.jsonHandler(s.getWalletBalance))
 	router.HandleFunc("/wallets/{address}/balance-snapshots", s.jsonHandler(s.getWalletBalanceSnapshots))
 	router.HandleFunc("/wallets/{address}/portfolio", s.jsonHandler(s.getWalletPortfolio))
+
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Hello, World!"))
+	})
+
 }
 
 func (s *Server) Start(ctx context.Context) {

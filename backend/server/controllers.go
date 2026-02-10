@@ -189,69 +189,6 @@ func (s *Server) getTokens(r *http.Request) (any, int, error) {
 	return response, http.StatusOK, nil
 }
 
-func (s *Server) getWalletBalance(r *http.Request) (any, int, error) {
-	var response GetWalletBalanceResponse
-	limit, offset, err := s.getOffsetPaginationParams(r)
-	if err != nil {
-		return nil, http.StatusBadRequest, err
-	}
-
-	address := r.PathValue("address")
-	tokenAddress := r.URL.Query().Get("token_address")
-	params := []interface{}{addrUtil.Normalize(address), limit, offset}
-	query := `SELECT chain_id, wallet_address, asset_type, asset_address, balance_raw FROM balances WHERE wallet_address = $1`
-
-	chainIdStr := r.URL.Query().Get("chain_id")
-	if chainIdStr != "" {
-		chainId, err := strconv.Atoi(chainIdStr)
-		if err != nil {
-			return nil, http.StatusBadRequest, err
-		}
-
-		query += fmt.Sprintf(" AND chain_id = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, chainId)
-	}
-
-	if addrUtil.IsValidLength(tokenAddress) {
-		query += fmt.Sprintf(" AND asset_address = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, addrUtil.Normalize(tokenAddress))
-	} else if addrUtil.IsNativeAsset(tokenAddress) {
-		query += " AND asset_address = 'native'"
-	}
-
-	query += " ORDER BY asset_type,asset_address DESC LIMIT $2 OFFSET $3"
-
-	rows, err := s.db.Pool().Query(r.Context(), query, params...)
-	if err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-	defer rows.Close()
-
-	balances := make([]db.BalanceEntity, 0)
-	for rows.Next() {
-		var balance db.BalanceEntity
-		err := rows.Scan(&balance.ChainID, &balance.WalletAddress, &balance.AssetType, &balance.AssetAddress, &balance.BalanceRaw)
-		if err != nil {
-			return nil, http.StatusInternalServerError, err
-		}
-		balance.WalletAddress = addrUtil.Format(balance.WalletAddress)
-		if balance.AssetAddress != "native" {
-			balance.AssetAddress = addrUtil.Format(balance.AssetAddress)
-		}
-		balances = append(balances, balance)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, http.StatusInternalServerError, err
-	}
-
-	response.Data.Balance = balances
-	response.Meta.Offset = offset
-	response.Meta.Limit = limit
-
-	return response, http.StatusOK, nil
-}
-
 func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 
 	var response GetWalletBalanceSnapshotsResponse
