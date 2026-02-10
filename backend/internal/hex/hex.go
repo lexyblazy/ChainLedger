@@ -32,8 +32,6 @@ func DecodeBigInt(s string) (*big.Int, error) {
 	return n, nil
 }
 
-
-
 func DecodeTimestamp(s string) (time.Time, error) {
 	uint64, err := DecodeUint64(s)
 	if err != nil {
@@ -100,4 +98,8 @@ func DecodeStringOrBytes32(hexData string) (string, error) {
 	}
 
 	return string(b[start:end]), nil
+}
+
+func IntToHex(n int64) string {
+	return fmt.Sprintf("0x%x", n)
 }

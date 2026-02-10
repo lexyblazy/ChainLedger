@@ -13,8 +13,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"polychain.capital/config"
 	"polychain.capital/db"
-	"polychain.capital/internal/hex"
 	addrUtil "polychain.capital/internal/address"
+	"polychain.capital/internal/hex"
 	"polychain.capital/rpc"
 )
 
@@ -111,12 +111,16 @@ func (w *NetworkWorker) refreshAddressSet(ctx context.Context) error {
 }
 
 func (w *NetworkWorker) start(ctx context.Context) error {
-	log.Println("🔗 Started", w.config.Name, "ingestion worker")
+	log.Println("🔗 Started", w.config.Name, "ingestion workflow")
 
 	err := w.populateAddressSet(ctx)
 
 	if err != nil {
 		return err
+	}
+
+	if len(w.addressSet) == 0 {
+		return errors.New("no addresses found")
 	}
 
 	retryDelay := time.Duration(w.config.SyncWorker.RetryDelayMs) * time.Millisecond
@@ -136,6 +140,11 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 	// 3. refresh the address set every N seconds
 	go w.refreshAddressSet(ctx)
 
+	var (
+		lastKnownHead     int64
+		lastHeadCheckTime time.Time
+	)
+
 	for {
 
 		var (
@@ -147,10 +156,44 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 		)
 
 		bn, err := w.fetchLastProcessedBlock(ctx)
-		nextBlockNumber := bn + 1
+
 		if err != nil {
-			return err
+			log.Println("error fetching last processed block", err)
+			time.Sleep(retryDelay)
+			retryDelay = min(retryDelay*2, maxDelay)
+			continue
 		}
+
+		nextBlockNumber := bn + 1
+
+		// do a check to ensure that there is sufficient block gap between the last known head and the best rpc block
+		// and throttle the rpc calls to ensure sufficient gap between the rpc calls
+		blockDelta := lastKnownHead - w.config.SyncWorker.BlockGap
+
+		if lastKnownHead == 0 || nextBlockNumber > blockDelta {
+
+			headPollInterval := time.Second * time.Duration(w.config.SyncWorker.BestRpcBlockPollIntervalSeconds)
+
+			if time.Since(lastHeadCheckTime) < headPollInterval {
+				time.Sleep(headPollInterval - time.Since(lastHeadCheckTime))
+				continue
+			}
+
+			bestRpcBlockNumber, err := w.getBestRpcBlockNumber(ctx)
+
+			if err != nil {
+				log.Println("error getting best rpc block number", err)
+				time.Sleep(retryDelay)
+				retryDelay = min(retryDelay*2, maxDelay)
+				continue
+			}
+
+			lastKnownHead = bestRpcBlockNumber
+			lastHeadCheckTime = time.Now()
+
+			continue
+		}
+
 		// parallelize fetching of block transactions and erc20 transfer logs
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -317,12 +360,12 @@ func (w *NetworkWorker) fetchLastProcessedBlock(ctx context.Context) (int64, err
 
 }
 
-func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, block int64) ([]rpc.Log, error) {
+func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, blockNumber int64) ([]rpc.Log, error) {
 
 	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
 		return w.rpcc.Call(ctx, "eth_getLogs", []interface{}{map[string]interface{}{
-			"fromBlock": block,
-			"toBlock":   block,
+			"fromBlock": hex.IntToHex(blockNumber),
+			"toBlock":   hex.IntToHex(blockNumber),
 			"topics":    []string{w.config.ERC20TransferTopic},
 		}})
 	})
@@ -344,7 +387,7 @@ func (w *NetworkWorker) fetchERC20TransferLogs(ctx context.Context, block int64)
 func (w *NetworkWorker) fetchBlockWithTransactions(ctx context.Context, blockNumber int64) (rpc.Block, error) {
 
 	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
-		return w.rpcc.Call(ctx, "eth_getBlockByNumber", []interface{}{blockNumber, true})
+		return w.rpcc.Call(ctx, "eth_getBlockByNumber", []interface{}{hex.IntToHex(blockNumber), true})
 	})
 	if err != nil {
 		return rpc.Block{}, err
