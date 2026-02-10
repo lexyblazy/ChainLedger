@@ -36,7 +36,7 @@ func (w *NetworkWorker) tokenDiscovery(ctx context.Context) error {
 
 		err := w.syncDiscoveredTokensInBatch(ctx)
 		if err != nil {
-			log.Println("Error syncing discovered tokens", err)
+			log.Println(w.config.Name, "Error syncing discovered tokens", err)
 		}
 
 		select {
@@ -60,13 +60,13 @@ func (w *NetworkWorker) syncTokenMetadata(ctx context.Context) error {
 
 		entities, err := w.fetchTokensForMetadataSyncInBatch(ctx)
 		if err != nil {
-			log.Println("Error fetching tokens for metadata sync", err)
+			log.Println(w.config.Name, "Error fetching tokens for metadata sync", err)
 			continue
 		}
 
 		err = w.fetchTokensMetadata(ctx, entities)
 		if err != nil {
-			log.Println("Error fetching tokens metadata", err)
+			log.Println(w.config.Name, "Error fetching tokens metadata", err)
 		}
 
 		select {
@@ -100,7 +100,7 @@ func (w *NetworkWorker) refreshAddressSet(ctx context.Context) error {
 		case <-time.After(interval):
 			addresses, err := w.getNewlyAddedAddresses(ctx)
 			if err != nil {
-				log.Println("error getting newly added addresses", err)
+				log.Println(w.config.Name, "error getting newly added addresses", err)
 				continue
 			}
 			for _, address := range addresses {
@@ -158,7 +158,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 		bn, err := w.fetchLastProcessedBlock(ctx)
 
 		if err != nil {
-			log.Println("error fetching last processed block", err)
+			log.Println(w.config.Name, "error fetching last processed block", err)
 			time.Sleep(retryDelay)
 			retryDelay = min(retryDelay*2, maxDelay)
 			continue
@@ -182,7 +182,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 			bestRpcBlockNumber, err := w.getBestRpcBlockNumber(ctx)
 
 			if err != nil {
-				log.Println("error getting best rpc block number", err)
+				log.Println(w.config.Name, "error getting best rpc block number", err)
 				time.Sleep(retryDelay)
 				retryDelay = min(retryDelay*2, maxDelay)
 				continue
@@ -227,14 +227,14 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 		}
 
 		if fetchBlockErr != nil {
-			log.Println("error fetching block transactions", fetchBlockErr)
+			log.Println(w.config.Name, "error fetching block transactions", fetchBlockErr)
 			time.Sleep(retryDelay)
 			retryDelay = min(retryDelay*2, maxDelay)
 			continue
 		}
 
 		if fetchERC20TransferLogsErr != nil {
-			log.Println("error fetching erc20 transfer logs", fetchERC20TransferLogsErr)
+			log.Println(w.config.Name, "error fetching erc20 transfer logs", fetchERC20TransferLogsErr)
 			time.Sleep(retryDelay)
 			retryDelay = min(retryDelay*2, maxDelay)
 			continue
@@ -247,7 +247,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 		}
 
 		if commitBlockErr != nil {
-			log.Println("error committing block atomically", commitBlockErr)
+			log.Println(w.config.Name, "error committing block atomically", commitBlockErr)
 			time.Sleep(retryDelay)
 			retryDelay = min(retryDelay*2, maxDelay)
 			continue
@@ -257,7 +257,7 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 			// take a snapshot of the balances
 			err := w.takeBalanceSnapshot(ctx, block)
 			if err != nil {
-				log.Println("error taking balance snapshot", err)
+				log.Println(w.config.Name, "error taking balance snapshot", err)
 			}
 		}
 
@@ -290,7 +290,7 @@ func (w *NetworkWorker) takeBalanceSnapshot(ctx context.Context, block rpc.Block
 
 	_, err = w.db.Pool().Exec(ctx, query, block.Number, blockTimestamp)
 	if err != nil {
-		log.Println("error taking balance snapshot", err)
+		log.Println(w.config.Name, "error taking balance snapshot", err)
 		return err
 	}
 
@@ -718,7 +718,7 @@ func (w *NetworkWorker) fetchTokensMetadata(ctx context.Context, entities []db.T
 
 			err = w.updateTokenMetadata(ctx, token, meta)
 			if err != nil {
-				log.Println("Error updating token metadata", err)
+				log.Println(w.config.Name, "Error updating token metadata", err)
 			}
 		}(entity)
 	}
@@ -735,7 +735,7 @@ func (w *NetworkWorker) fetchTokenMetadataDecimals(ctx context.Context, tokenAdd
 	})
 
 	if err != nil {
-		log.Println("Error fetching token metadata decimals", tokenAddress, err)
+		log.Println(w.config.Name, "Error fetching token metadata decimals", tokenAddress, err)
 		return 0, err
 	}
 
@@ -763,7 +763,7 @@ func (w *NetworkWorker) fetchTokenMetadataName(ctx context.Context, tokenAddress
 	})
 
 	if err != nil {
-		log.Println("Error fetching token metadata name", tokenAddress, err)
+		log.Println(w.config.Name, "Error fetching token metadata name", tokenAddress, err)
 		return "", err
 	}
 
@@ -786,7 +786,7 @@ func (w *NetworkWorker) fetchTokenMetadataSymbol(ctx context.Context, tokenAddre
 	})
 
 	if err != nil {
-		log.Println("Error fetching token metadata symbol", tokenAddress, err)
+		log.Println(w.config.Name, "Error fetching token metadata symbol", tokenAddress, err)
 		return "", err
 	}
 
@@ -918,7 +918,7 @@ func (w *NetworkWorker) getStatus(ctx context.Context) (NetworkStatus, error) {
 		status.BestRpcBlockNumber, err = w.getBestRpcBlockNumber(ctx)
 
 		if err != nil {
-			log.Println("Error getting best rpc block number", err)
+			log.Println(w.config.Name, "Error getting best rpc block number", err)
 		}
 	}()
 
@@ -932,7 +932,7 @@ func (w *NetworkWorker) getStatus(ctx context.Context) (NetworkStatus, error) {
 		var maxBlockNumber int64
 		err = w.db.Pool().QueryRow(ctx, blocksQuery, w.config.ChainID).Scan(&blocksCount, &maxBlockNumber)
 		if err != nil {
-			log.Println("Error getting blocks count", err)
+			log.Println(w.config.Name, "Error getting blocks count", err)
 		} else {
 			status.IngestedBlocksCount = blocksCount
 			status.IngestedBlocksMaxBlockNumber = maxBlockNumber
@@ -940,7 +940,7 @@ func (w *NetworkWorker) getStatus(ctx context.Context) (NetworkStatus, error) {
 		var tokensCount int64
 		err = w.db.Pool().QueryRow(ctx, tokensQuery, w.config.ChainID).Scan(&tokensCount)
 		if err != nil {
-			log.Println("Error getting tokens count", err)
+			log.Println(w.config.Name, "Error getting tokens count", err)
 		} else {
 
 			status.TokensCount = tokensCount
