@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strconv"
+	"sync"
 
 	"polychain.capital/config"
 	"polychain.capital/db"
@@ -70,14 +71,27 @@ func (s *IngestionService) Cleanup(ctx context.Context) {
 
 func (s *IngestionService) GetStatus(ctx context.Context) (map[string]NetworkStatus, error) {
 	status := make(map[string]NetworkStatus)
-	for chanId, nw := range s.nw {
-		networkStatus, err := nw.getStatus(ctx)
 
-		if err != nil {
-			log.Println("Error getting status for", nw.config.Name, "ingestion worker", err)
-			continue
-		}
-		status[strconv.Itoa(chanId)] = networkStatus
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+
+	for _, nw := range s.nw {
+		wg.Add(1)
+		go func(nw *NetworkWorker) {
+			defer wg.Done()
+			networkStatus, err := nw.getStatus(ctx)
+			if err != nil {
+				log.Println("Error getting status for", nw.config.Name, "ingestion worker", err)
+				return
+			}
+			mu.Lock()
+			status[strconv.Itoa(nw.config.ChainID)] = networkStatus
+			mu.Unlock()
+		}(nw)
 	}
+
+	wg.Wait()
 	return status, nil
 }
