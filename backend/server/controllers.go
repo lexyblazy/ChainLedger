@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"polychain.capital/db"
-	"polychain.capital/internal/hex"
+	addrUtil "polychain.capital/internal/address" // address utility functions
 )
 
 func (s *Server) getOffsetPaginationParams(r *http.Request) (limit int, offset int, err error) {
@@ -57,7 +57,7 @@ func (s *Server) createWallet(r *http.Request) (any, int, error) {
 		return nil, http.StatusBadRequest, err
 	}
 
-	if body.Address == "" || !hex.IsValidAddressLength(body.Address) {
+	if body.Address == "" || !addrUtil.IsValidLength(body.Address) {
 		return nil, http.StatusBadRequest, errors.New("address is required and must be a valid address")
 	}
 
@@ -70,7 +70,7 @@ func (s *Server) createWallet(r *http.Request) (any, int, error) {
 	 VALUES ($1, $2, $3, $4) ON CONFLICT (address, chain_id)
 	 DO UPDATE SET entity_type = $3, label = $4, updated_at = now()`
 
-	_, err = s.db.Pool().Exec(r.Context(), query, hex.NormalizeAddress(body.Address), body.ChainID, body.EntityType, body.Label)
+	_, err = s.db.Pool().Exec(r.Context(), query, addrUtil.Normalize(body.Address), body.ChainID, body.EntityType, body.Label)
 
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
@@ -119,7 +119,7 @@ func (s *Server) handleWallets(r *http.Request) (any, int, error) {
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		wallet.Address = hex.FormatAddress(wallet.Address)
+		wallet.Address = addrUtil.Format(wallet.Address)
 		wallets = append(wallets, wallet)
 	}
 
@@ -174,7 +174,7 @@ func (s *Server) getTokens(r *http.Request) (any, int, error) {
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		token.TokenAddress = hex.FormatAddress(token.TokenAddress)
+		token.TokenAddress = addrUtil.Format(token.TokenAddress)
 		tokens = append(tokens, token)
 	}
 
@@ -198,7 +198,7 @@ func (s *Server) getWalletBalance(r *http.Request) (any, int, error) {
 
 	address := r.PathValue("address")
 	tokenAddress := r.URL.Query().Get("token_address")
-	params := []interface{}{hex.NormalizeAddress(address), limit, offset}
+	params := []interface{}{addrUtil.Normalize(address), limit, offset}
 	query := `SELECT chain_id, wallet_address, asset_type, asset_address, balance_raw FROM balances WHERE wallet_address = $1`
 
 	chainIdStr := r.URL.Query().Get("chain_id")
@@ -212,11 +212,11 @@ func (s *Server) getWalletBalance(r *http.Request) (any, int, error) {
 		params = append(params, chainId)
 	}
 
-	if hex.IsValidAddressLength(tokenAddress) {
+	if addrUtil.IsValidLength(tokenAddress) {
 		query += fmt.Sprintf(" AND asset_address = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, hex.NormalizeAddress(tokenAddress))
-	} else if tokenAddress == "null" {
-		query += " AND asset_address is null"
+		params = append(params, addrUtil.Normalize(tokenAddress))
+	} else if addrUtil.IsNativeAsset(tokenAddress) {
+		query += " AND asset_address = 'native'"
 	}
 
 	query += " ORDER BY asset_type,asset_address DESC LIMIT $2 OFFSET $3"
@@ -234,10 +234,9 @@ func (s *Server) getWalletBalance(r *http.Request) (any, int, error) {
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		balance.WalletAddress = hex.FormatAddress(balance.WalletAddress)
-		if balance.AssetAddress != nil {
-			formattedAddress := hex.FormatAddress(*balance.AssetAddress)
-			balance.AssetAddress = &formattedAddress
+		balance.WalletAddress = addrUtil.Format(balance.WalletAddress)
+		if balance.AssetAddress != "native" {
+			balance.AssetAddress = addrUtil.Format(balance.AssetAddress)
 		}
 		balances = append(balances, balance)
 	}
@@ -259,7 +258,7 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 	address := r.PathValue("address")
 	limit, cursorId := s.getCursorPaginationParams(r, "cursor_id")
 
-	params := []interface{}{hex.NormalizeAddress(address), limit}
+	params := []interface{}{addrUtil.Normalize(address), limit}
 
 	chainID := r.URL.Query().Get("chain_id")
 	tokenAddress := r.URL.Query().Get("token_address")
@@ -273,12 +272,13 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 		params = append(params, chainID)
 	}
 
-	if hex.IsValidAddressLength(tokenAddress) {
+	if addrUtil.IsNativeAsset(tokenAddress) {
+		query += " AND asset_address = 'native'"
+	} else if addrUtil.IsValidLength(tokenAddress) {
 		query += fmt.Sprintf(" AND asset_address = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, hex.NormalizeAddress(tokenAddress))
-	} else if tokenAddress == "null" {
-		// null is a special value for native assets
-		query += " AND asset_address is null"
+		params = append(params, addrUtil.Normalize(tokenAddress))
+	} else {
+		return nil, http.StatusBadRequest, errors.New("token_address is required and must be a valid address")
 	}
 
 	if cursorId != "" {
@@ -301,10 +301,9 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
-		balanceSnapshot.WalletAddress = hex.FormatAddress(balanceSnapshot.WalletAddress)
-		if balanceSnapshot.AssetAddress != nil {
-			formattedAddress := hex.FormatAddress(*balanceSnapshot.AssetAddress)
-			balanceSnapshot.AssetAddress = &formattedAddress
+		balanceSnapshot.WalletAddress = addrUtil.Format(balanceSnapshot.WalletAddress)
+		if balanceSnapshot.AssetAddress != "native" {
+			balanceSnapshot.AssetAddress = addrUtil.Format(balanceSnapshot.AssetAddress)
 		}
 		balanceSnapshots = append(balanceSnapshots, balanceSnapshot)
 	}
@@ -314,7 +313,11 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 	}
 
 	response.Data.BalanceSnapshots = balanceSnapshots
-	response.Meta.CursorId = balanceSnapshots[len(balanceSnapshots)-1].ID
+	if len(balanceSnapshots) > 0 {
+		response.Meta.CursorId = balanceSnapshots[len(balanceSnapshots)-1].ID
+	} else {
+		response.Meta.CursorId = 0
+	}
 	response.Meta.Limit = limit
 
 	return response, http.StatusOK, nil
@@ -357,7 +360,7 @@ ORDER BY
 		return nil, http.StatusBadRequest, err
 	}
 
-	params := []interface{}{hex.NormalizeAddress(address), chainID, limit, offset}
+	params := []interface{}{addrUtil.Normalize(address), chainID, limit, offset}
 	rows, err := s.db.Pool().Query(r.Context(), query, params...)
 
 	if err != nil {
@@ -375,8 +378,8 @@ ORDER BY
 			return nil, http.StatusInternalServerError, err
 		}
 
-		if hex.IsValidAddressLength(p.AssetAddress) {
-			p.AssetAddress = hex.FormatAddress(p.AssetAddress)
+		if addrUtil.IsValidLength(p.AssetAddress) {
+			p.AssetAddress = addrUtil.Format(p.AssetAddress)
 		}
 
 		if p.Symbol == nil {
