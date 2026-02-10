@@ -63,11 +63,11 @@ type GetWalletBalanceResponse struct {
 }
 
 type WalletPortfolio struct {
-	AssetType string `json:"asset_type"`
-	AssetAddress string `json:"asset_address"`
-	BalanceRaw string `json:"balance_raw"`
-	Symbol *string `json:"symbol"`
-	Decimals *int8 `json:"decimals"`
+	AssetType    string  `json:"asset_type"`
+	AssetAddress string  `json:"asset_address"`
+	BalanceRaw   string  `json:"balance_raw"`
+	Symbol       *string `json:"symbol"`
+	Decimals     *int8   `json:"decimals"`
 }
 
 type GetWalletPortfolioResponse struct {

@@ -14,6 +14,7 @@ import (
 	"polychain.capital/config"
 	"polychain.capital/db"
 	"polychain.capital/internal/hex"
+	addrUtil "polychain.capital/internal/address"
 	"polychain.capital/rpc"
 )
 
@@ -84,7 +85,7 @@ func (w *NetworkWorker) populateAddressSet(ctx context.Context) error {
 		return err
 	}
 	for _, address := range addresses {
-		w.addressSet[hex.NormalizeAddress(address)] = true
+		w.addressSet[addrUtil.Normalize(address)] = true
 	}
 
 	return nil
@@ -103,7 +104,7 @@ func (w *NetworkWorker) refreshAddressSet(ctx context.Context) error {
 				continue
 			}
 			for _, address := range addresses {
-				w.addressSet[hex.NormalizeAddress(address)] = true
+				w.addressSet[addrUtil.Normalize(address)] = true
 			}
 		}
 	}
@@ -367,7 +368,7 @@ func (w *NetworkWorker) filterTransactions(transactions []rpc.Transaction) []rpc
 			continue
 		}
 
-		if w.addressSet[hex.NormalizeAddress(transaction.From)] || w.addressSet[hex.NormalizeAddress(transaction.To)] {
+		if w.addressSet[addrUtil.Normalize(transaction.From)] || w.addressSet[addrUtil.Normalize(transaction.To)] {
 			filteredTransactions = append(filteredTransactions, transaction)
 		}
 	}
@@ -380,14 +381,14 @@ func (w *NetworkWorker) filterERC20TransferLogs(logs []rpc.Log) []rpc.Log {
 	for _, l := range logs {
 		method := l.Topics[0]
 
-		if !hex.IsAddressEqual(method, w.config.ERC20TransferTopic) || len(l.Topics) != 3 {
+		if !addrUtil.IsEqual(method, w.config.ERC20TransferTopic) || len(l.Topics) != 3 {
 			continue
 		}
 
 		from := l.Topics[1]
 		to := l.Topics[2]
 
-		if w.addressSet[hex.NormalizeAddress(from)] || w.addressSet[hex.NormalizeAddress(to)] {
+		if w.addressSet[addrUtil.Normalize(from)] || w.addressSet[addrUtil.Normalize(to)] {
 			filteredLogs = append(filteredLogs, l)
 		}
 	}
@@ -501,8 +502,8 @@ func (w *NetworkWorker) insertNativeTransfers(ctx context.Context, tx pgx.Tx, bl
 
 		values = append(values,
 			transaction.Hash, blockNumber, blockTimestamp,
-			hex.NormalizeAddress(transaction.From),
-			hex.NormalizeAddress(transaction.To),
+			addrUtil.Normalize(transaction.From),
+			addrUtil.Normalize(transaction.To),
 			transaction.Value, w.config.ChainID,
 		)
 		valuesPlaceholder = append(valuesPlaceholder, currentPlaceholder)
@@ -566,9 +567,9 @@ func (w *NetworkWorker) insertERC20Transfers(ctx context.Context, tx pgx.Tx, blo
 		values = append(values,
 			l.TxHash, logIndex,
 			blockNumber, blockTimestamp,
-			hex.NormalizeAddress(l.Topics[1]),
-			hex.NormalizeAddress(l.Topics[2]),
-			hex.NormalizeAddress(l.Address),
+			addrUtil.Normalize(l.Topics[1]),
+			addrUtil.Normalize(l.Topics[2]),
+			addrUtil.Normalize(l.Address),
 			l.Data, w.config.ChainID)
 
 		valuesPlaceholder = append(valuesPlaceholder, currentPlaceholder)
@@ -760,7 +761,7 @@ func (w *NetworkWorker) fetchTokenMetadataSymbol(ctx context.Context, tokenAddre
 func (w *NetworkWorker) fetchTokenMetadata(ctx context.Context, entity db.TokenEntity) (*TokenMetadata, error) {
 
 	meta := &TokenMetadata{}
-	tokenAddress := hex.FormatAddress(entity.TokenAddress)
+	tokenAddress := addrUtil.Format(entity.TokenAddress)
 
 	// decimals (most important)
 	decimals, err := w.fetchTokenMetadataDecimals(ctx, tokenAddress)
