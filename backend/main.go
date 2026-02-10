@@ -48,7 +48,7 @@ func main() {
 	<-ctx.Done()
 
 	// optional shutdown with timeout
-	timeout := 30 * time.Second
+	timeout := time.Duration(config.ShutdownTimeoutSeconds) * time.Second
 	timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), timeout)
 	defer timeoutCancel()
 

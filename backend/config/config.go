@@ -6,9 +6,10 @@ import (
 )
 
 type Config struct {
-	Networks    map[string]NetworkConfig `json:"networks"`
-	DatabaseURL string                   `json:"databaseURL"`
-	Api         ApiConfig                `json:"api"`
+	Networks               map[string]NetworkConfig `json:"networks"`
+	DatabaseURL            string                   `json:"databaseURL"`
+	Api                    ApiConfig                `json:"api"`
+	ShutdownTimeoutSeconds int                      `json:"shutdownTimeoutSeconds"`
 }
 
 type WorkerConfig struct {
