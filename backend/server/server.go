@@ -54,6 +54,7 @@ func (s *Server) SetupRoutes(router *http.ServeMux) {
 
 	router.HandleFunc("/wallets/{address}/balance", s.jsonHandler(s.getWalletBalance))
 	router.HandleFunc("/wallets/{address}/balance-snapshots", s.jsonHandler(s.getWalletBalanceSnapshots))
+	router.HandleFunc("/wallets/{address}/portfolio", s.jsonHandler(s.getWalletPortfolio))
 }
 
 func (s *Server) Start(ctx context.Context) {

@@ -319,3 +319,86 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 
 	return response, http.StatusOK, nil
 }
+
+func (s *Server) getWalletPortfolio(r *http.Request) (any, int, error) {
+	var response GetWalletPortfolioResponse
+	address := r.PathValue("address")
+	chainIDStr := r.URL.Query().Get("chain_id")
+
+	if chainIDStr == "" {
+		return nil, http.StatusBadRequest, errors.New("chain_id is required")
+	}
+
+	chainID, err := strconv.Atoi(chainIDStr)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	query := `
+	SELECT
+  b.asset_type,
+  b.asset_address,
+  b.balance_raw,
+  t.symbol,
+  t.decimals
+FROM balances b
+LEFT JOIN tokens t
+  ON t.chain_id = b.chain_id
+ AND t.token_address = b.asset_address
+WHERE b.wallet_address = $1
+  AND b.chain_id = $2
+ORDER BY
+  CASE WHEN b.asset_type = 'native' THEN 0 ELSE 1 END,
+  t.symbol NULLS LAST,
+  b.asset_address LIMIT $3 OFFSET $4;`
+
+	limit, offset, err := s.getOffsetPaginationParams(r)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+
+	params := []interface{}{hex.NormalizeAddress(address), chainID, limit, offset}
+	rows, err := s.db.Pool().Query(r.Context(), query, params...)
+
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	defer rows.Close()
+
+	records := make([]WalletPortfolio, 0)
+
+	for rows.Next() {
+		var p WalletPortfolio
+		err := rows.Scan(&p.AssetType, &p.AssetAddress, &p.BalanceRaw, &p.Symbol, &p.Decimals)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+
+		if hex.IsValidAddressLength(p.AssetAddress) {
+			p.AssetAddress = hex.FormatAddress(p.AssetAddress)
+		}
+
+		if p.Symbol == nil {
+			nativeSymbol := s.config.Networks[strconv.Itoa(chainID)].Symbol
+			p.Symbol = &nativeSymbol
+		}
+
+		if p.Decimals == nil {
+			nativeDecimals := int8(s.config.Networks[strconv.Itoa(chainID)].Decimals)
+			p.Decimals = &nativeDecimals
+		}
+
+		records = append(records, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	response.Data.Portfolio = records
+	response.Meta.Offset = offset
+	response.Meta.Limit = limit
+
+	return response, http.StatusOK, nil
+}
