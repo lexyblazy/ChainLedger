@@ -95,7 +95,7 @@ func (s *Server) handleWallets(r *http.Request) (any, int, error) {
 	chainID := r.URL.Query().Get("chain_id")
 	var response GetWalletsResponse
 
-	query := `SELECT address, chain_id, entity_type, label FROM address_registry`
+	query := `SELECT * FROM address_registry`
 	params := []interface{}{limit, offset}
 
 	if chainID != "" {
@@ -115,7 +115,7 @@ func (s *Server) handleWallets(r *http.Request) (any, int, error) {
 
 	for rows.Next() {
 		var wallet db.AddressRegistryEntity
-		err := rows.Scan(&wallet.Address, &wallet.ChainID, &wallet.EntityType, &wallet.Label)
+		err := rows.Scan(&wallet.Address, &wallet.ChainID, &wallet.EntityType, &wallet.Label, &wallet.CreatedAt, &wallet.UpdatedAt)
 		if err != nil {
 			return nil, http.StatusInternalServerError, err
 		}
