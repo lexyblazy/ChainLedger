@@ -157,6 +157,10 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 
 		bn, err := w.fetchLastProcessedBlock(ctx)
 
+		if errors.Is(err, context.Canceled) {
+			return context.Canceled
+		}
+
 		if err != nil {
 			log.Println(w.config.Name, "error fetching last processed block", err)
 			time.Sleep(retryDelay)
@@ -180,6 +184,10 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 			}
 
 			bestRpcBlockNumber, err := w.getBestRpcBlockNumber(ctx)
+
+			if errors.Is(err, context.Canceled) {
+				return context.Canceled
+			}
 
 			if err != nil {
 				log.Println(w.config.Name, "error getting best rpc block number", err)
