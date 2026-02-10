@@ -854,6 +854,7 @@ func (w *NetworkWorker) getStatus(ctx context.Context) (NetworkStatus, error) {
 	status.Name = w.config.Name
 	status.ChainID = int64(w.config.ChainID)
 	status.StartBlock = w.config.StartBlock
+	status.AddressesCount = len(w.addressSet)
 
 	var wg sync.WaitGroup
 

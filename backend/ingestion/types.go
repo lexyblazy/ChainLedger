@@ -16,4 +16,5 @@ type NetworkStatus struct {
 	TokensCount                  int64   `json:"tokensCount"`
 	IngestionLagBlocksCount      int64   `json:"ingestionLagBlocksCount"`
 	IngestionProgressPct         float64 `json:"ingestionProgressPct"`
+	AddressesCount               int     `json:"addressesCount"`
 }
