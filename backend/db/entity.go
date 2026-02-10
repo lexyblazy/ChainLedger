@@ -28,7 +28,7 @@ type BalanceSnapshotEntity struct {
 	ChainID        int64     `json:"chain_id"`
 	WalletAddress  string    `json:"wallet_address"`
 	AssetType      string    `json:"asset_type"`
-	AssetAddress   *string   `json:"asset_address"` // nullable
+	AssetAddress   string    `json:"asset_address"`
 	BalanceRaw     string    `json:"balance_raw"`
 	BlockNumber    int64     `json:"block_number"`
 	BlockTimestamp time.Time `json:"block_timestamp"`
@@ -41,7 +41,7 @@ type BalanceEntity struct {
 	ChainID       int64     `json:"chain_id"`
 	WalletAddress string    `json:"wallet_address"`
 	AssetType     string    `json:"asset_type"`
-	AssetAddress  *string   `json:"asset_address"` // nullable
+	AssetAddress  string    `json:"asset_address"`
 	BalanceRaw    string    `json:"balance_raw"`
 	CreatedAt     time.Time `json:"-"`
 	UpdatedAt     time.Time `json:"-"`
