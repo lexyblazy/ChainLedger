@@ -12,22 +12,35 @@ import (
 )
 
 func (s *Server) getOffsetPaginationParams(r *http.Request) (limit int, offset int, err error) {
-	limit = s.config.Api.MaxResults
-	offset = 0
 
-	page := r.URL.Query().Get("page")
-	if page == "" {
-		return limit, offset, nil
+	offsetStr := r.URL.Query().Get("offset")
+	limitStr := r.URL.Query().Get("limit")
+	if offsetStr == "" {
+		offset = 0
+	} else {
+		offsetInt, err := strconv.Atoi(offsetStr)
+
+		if err != nil {
+			return 0, 0, err
+		}
+
+		offset = offsetInt
 	}
 
-	pageInt, err := strconv.Atoi(page)
-	if err != nil {
-		return limit, offset, err
+	if limitStr == "" {
+		limit = s.config.Api.MaxResults
+	} else {
+		limitInt, err := strconv.Atoi(limitStr)
+		if err != nil {
+			return 0, 0, err
+		}
+		limit = limitInt
 	}
 
-	offset = (pageInt - 1) * limit
+	limit = min(limit, s.config.Api.MaxResults)
+	offset = max(offset, 0)
 
-	return limit, max(offset, 0), nil
+	return limit, offset, nil
 }
 
 func (s *Server) getCursorPaginationParams(r *http.Request, cursorName string) (limit int, cursor interface{}) {

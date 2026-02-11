@@ -197,7 +197,7 @@ This is the canonical consumer-facing view of balances.
 ### Balance Snapshots
 
 ```http
-GET /wallets/{address}/balance-snapshots?chain_id=1&limit=50&cursor=123
+GET /wallets/{address}/balance-snapshots?chain_id=1&limit=50&cursor_id=123
 ```
 
 * Historical balances
