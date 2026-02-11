@@ -22,6 +22,24 @@ func New(db *db.DB, config *config.Config, i *ingestion.IngestionService) *Serve
 	return &Server{port: config.Api.Port, db: db, config: config, i: i}
 }
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		// Handle preflight
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) jsonHandler(fn func(r *http.Request) (any, int, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -59,14 +77,16 @@ func (s *Server) SetupRoutes(router *http.ServeMux) {
 }
 
 func (s *Server) Start(ctx context.Context) {
-	log.Println("Starting server on port", s.port)
-	router := http.NewServeMux()
+	log.Println("🚀 Starting server on port", s.port)
+	mux := http.NewServeMux()
 
-	s.SetupRoutes(router)
+	s.SetupRoutes(mux)
+
+	handler := corsMiddleware(mux)
 
 	server := &http.Server{
 		Addr:    ":" + s.port,
-		Handler: router,
+		Handler: handler,
 	}
 
 	go func() {
