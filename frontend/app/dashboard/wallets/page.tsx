@@ -17,11 +17,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDate } from "@/lib/date";
 import { ChainSelector } from "@/components/chain-selector";
 import { WalletUpsertDialog } from "@/components/wallet-upsert-dialog";
 import { useRouter } from "next/navigation";
 import { PaginationControls } from "@/components/pagination-controls";
+import { formatDate } from "@/lib/format";
 
 const chains = Object.values(CHAINS);
 
