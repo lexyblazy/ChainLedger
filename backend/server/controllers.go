@@ -359,9 +359,17 @@ ORDER BY
 		return nil, http.StatusInternalServerError, err
 	}
 
+	var total int
+	err = s.db.Pool().QueryRow(r.Context(), "SELECT COUNT(*) FROM balances WHERE wallet_address = $1 AND chain_id = $2",
+		addrUtil.Normalize(address), chainID).Scan(&total)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
 	response.Data.Portfolio = records
 	response.Meta.Offset = offset
 	response.Meta.Limit = limit
+	response.Meta.Total = total
 
 	return response, http.StatusOK, nil
 }
