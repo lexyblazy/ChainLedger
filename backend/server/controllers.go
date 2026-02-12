@@ -106,19 +106,16 @@ func (s *Server) handleWallets(r *http.Request) (any, int, error) {
 	}
 
 	chainID := r.URL.Query().Get("chain_id")
-	var response GetWalletsResponse
 
-	query := `SELECT * FROM address_registry`
-	params := []interface{}{limit, offset}
-
-	if chainID != "" {
-		query += fmt.Sprintf(" WHERE chain_id = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, chainID)
+	if chainID == "" {
+		return nil, http.StatusBadRequest, errors.New("chain_id is required")
 	}
 
-	query += ` LIMIT $1 OFFSET $2`
+	var response GetWalletsResponse
 
-	rows, err := s.db.Pool().Query(r.Context(), query, params...)
+	params := []interface{}{chainID, limit, offset}
+
+	rows, err := s.db.Pool().Query(r.Context(), "SELECT * FROM address_registry WHERE chain_id = $1 LIMIT $2 OFFSET $3", params...)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -140,9 +137,17 @@ func (s *Server) handleWallets(r *http.Request) (any, int, error) {
 		return nil, http.StatusInternalServerError, err
 	}
 
+	var total int
+	err = s.db.Pool().QueryRow(r.Context(), "SELECT COUNT(*) FROM address_registry WHERE chain_id = $1", chainID).Scan(&total)
+
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
 	response.Data.Wallets = wallets
 	response.Meta.Offset = offset
 	response.Meta.Limit = limit
+	response.Meta.Total = total
 
 	return response, http.StatusOK, nil
 }
@@ -156,20 +161,16 @@ func (s *Server) getTokens(r *http.Request) (any, int, error) {
 
 	var response GetTokensResponse
 
-	query := `SELECT chain_id, token_address, symbol, name, decimals FROM tokens`
-	params := []interface{}{limit, offset}
+	chainId := r.URL.Query().Get("chain_id")
 
-	chainIdStr := r.URL.Query().Get("chain_id")
-	if chainIdStr != "" {
-		chainId, err := strconv.Atoi(chainIdStr)
-		if err != nil {
-			return nil, http.StatusBadRequest, err
-		}
-		query += fmt.Sprintf(" WHERE chain_id = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, chainId)
+	if chainId == "" {
+		return nil, http.StatusBadRequest, errors.New("chain_id is required")
 	}
 
-	query += ` order by first_seen_block asc LIMIT $1 OFFSET $2`
+	query := `SELECT chain_id, token_address, symbol, name, decimals FROM tokens 
+	WHERE chain_id = $1 ORDER BY first_seen_block ASC LIMIT $2 OFFSET $3`
+
+	params := []interface{}{chainId, limit, offset}
 
 	rows, err := s.db.Pool().Query(r.Context(), query, params...)
 
@@ -195,32 +196,39 @@ func (s *Server) getTokens(r *http.Request) (any, int, error) {
 		return nil, http.StatusInternalServerError, err
 	}
 
+	var total int
+	err = s.db.Pool().QueryRow(r.Context(), "SELECT COUNT(*) FROM tokens WHERE chain_id = $1", chainId).Scan(&total)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
 	response.Data.Tokens = tokens
 	response.Meta.Offset = offset
 	response.Meta.Limit = limit
+	response.Meta.Total = total
 
 	return response, http.StatusOK, nil
 }
 
 func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 
+	chainID := r.URL.Query().Get("chain_id")
+
+	if chainID == "" {
+		return nil, http.StatusBadRequest, errors.New("chain_id is required")
+	}
+
 	var response GetWalletBalanceSnapshotsResponse
 	address := r.PathValue("address")
 	limit, cursorId := s.getCursorPaginationParams(r, "cursor_id")
 
-	params := []interface{}{addrUtil.Normalize(address), limit}
-
-	chainID := r.URL.Query().Get("chain_id")
 	tokenAddress := r.URL.Query().Get("token_address")
 
 	query := `SELECT id, chain_id, wallet_address, asset_type, asset_address,
 	  balance_raw, block_number, block_timestamp
-	FROM balance_snapshots WHERE wallet_address = $1`
+	FROM balance_snapshots WHERE wallet_address = $1 AND chain_id = $2`
 
-	if chainID != "" {
-		query += fmt.Sprintf(" AND chain_id = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, chainID)
-	}
+	params := []interface{}{addrUtil.Normalize(address), chainID, limit}
 
 	if addrUtil.IsNativeAsset(tokenAddress) {
 		query += " AND asset_address = 'native'"
@@ -236,7 +244,7 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 		params = append(params, cursorId)
 	}
 
-	query += ` order by id desc LIMIT $2`
+	query += ` order by id desc LIMIT $3`
 
 	rows, err := s.db.Pool().Query(r.Context(), query, params...)
 	if err != nil {
@@ -265,8 +273,10 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 	response.Data.BalanceSnapshots = balanceSnapshots
 	if len(balanceSnapshots) > 0 {
 		response.Meta.CursorId = balanceSnapshots[len(balanceSnapshots)-1].ID
+		response.Meta.HasMore = true
 	} else {
 		response.Meta.CursorId = 0
+		response.Meta.HasMore = false
 	}
 	response.Meta.Limit = limit
 
