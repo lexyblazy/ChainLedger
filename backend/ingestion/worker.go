@@ -110,7 +110,7 @@ func (w *NetworkWorker) refreshAddressSet(ctx context.Context) error {
 	}
 }
 
-func (w *NetworkWorker) start(ctx context.Context) error {
+func (w *NetworkWorker) start(ctx context.Context, syncBlocks bool) error {
 	log.Println("🔗 Started", w.config.Name, "ingestion workflow")
 
 	err := w.populateAddressSet(ctx)
@@ -139,6 +139,12 @@ func (w *NetworkWorker) start(ctx context.Context) error {
 
 	// 3. refresh the address set every N seconds
 	go w.refreshAddressSet(ctx)
+
+	// a configuration flag to disable block syncing temporarily for testing purposes
+	if !syncBlocks {
+		log.Println("🔗 Block syncing disabled for", w.config.Name, "ingestion workflow")
+		return nil
+	}
 
 	var (
 		lastKnownHead     int64

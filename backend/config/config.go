@@ -10,6 +10,7 @@ type Config struct {
 	DatabaseURL            string                   `json:"databaseURL"`
 	Api                    ApiConfig                `json:"api"`
 	ShutdownTimeoutSeconds int                      `json:"shutdownTimeoutSeconds"`
+	SyncBlocks             bool                     `json:"syncBlocks"`
 }
 
 type WorkerConfig struct {

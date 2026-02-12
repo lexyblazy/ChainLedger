@@ -82,5 +82,6 @@
     "maxResults": "<MAX_RESULTS_COUNT_HERE>"
   },
 
-  "shutdownTimeoutSeconds": 120
+  "shutdownTimeoutSeconds": 120,
+  "syncBlocks": true
 }
