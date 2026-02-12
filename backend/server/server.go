@@ -83,6 +83,7 @@ func (s *Server) Start(ctx context.Context) {
 	s.SetupRoutes(mux)
 
 	handler := corsMiddleware(mux)
+	// TODO: add a rate limiter
 
 	server := &http.Server{
 		Addr:    ":" + s.port,

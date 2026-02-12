@@ -11,15 +11,18 @@ type GetStatusResponse struct {
 	} `json:"data"`
 }
 
+type OffsetPaginationMeta struct {
+	Offset int `json:"offset"`
+	Limit  int `json:"limit"`
+	Total  int `json:"total"`
+}
+
 type GetWalletsResponse struct {
 	Data struct {
 		Wallets []db.AddressRegistryEntity `json:"wallets"`
 	} `json:"data"`
 
-	Meta struct {
-		Offset int `json:"offset"`
-		Limit  int `json:"limit"`
-	} `json:"meta"`
+	Meta OffsetPaginationMeta `json:"meta"`
 }
 
 type CreateWalletRequestBody struct {
@@ -34,10 +37,7 @@ type GetTokensResponse struct {
 		Tokens []db.TokenEntity `json:"tokens"`
 	} `json:"data"`
 
-	Meta struct {
-		Offset int `json:"offset"`
-		Limit  int `json:"limit"`
-	} `json:"meta"`
+	Meta OffsetPaginationMeta `json:"meta"`
 }
 
 type GetWalletBalanceSnapshotsResponse struct {
@@ -48,6 +48,7 @@ type GetWalletBalanceSnapshotsResponse struct {
 	Meta struct {
 		CursorId int64 `json:"cursor_id"`
 		Limit    int   `json:"limit"`
+		HasMore  bool  `json:"has_more"`
 	} `json:"meta"`
 }
 
@@ -64,10 +65,7 @@ type GetWalletPortfolioResponse struct {
 		Portfolio []WalletPortfolio `json:"portfolio"`
 	} `json:"data"`
 
-	Meta struct {
-		Offset int `json:"offset"`
-		Limit  int `json:"limit"`
-	} `json:"meta"`
+	Meta OffsetPaginationMeta `json:"meta"`
 }
 
 type ErrorResponse struct {
