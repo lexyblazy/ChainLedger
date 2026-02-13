@@ -40,10 +40,11 @@ services:
     networks:
       - polychain_net
 
-  backend:
+  api:
     build: ./backend
-    container_name: polychain_backend
+    container_name: polychain_api
     restart: unless-stopped
+    command: ["./app", "api"]
     env_file:
       - .env
     depends_on:
@@ -56,6 +57,19 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
 
+  worker:
+    build: ./backend
+    container_name: polychain_worker
+    restart: unless-stopped
+    command: ["./app", "worker"]
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - polychain_net
+
   frontend:
     build: 
       context: ./frontend
@@ -67,7 +81,7 @@ services:
       - .env
 
     depends_on:
-      - backend
+      - api
     networks:
       - polychain_net
     ports:
@@ -96,7 +110,7 @@ services:
           -f /backups/backup_$(date +%Y%m%d_%H%M%S).dump;
         echo "Backup complete.";
         find /backups -type f -mtime +7 -delete;
-        sleep 86400;
+        sleep 43200;
       done'
     networks:
       - polychain_net
