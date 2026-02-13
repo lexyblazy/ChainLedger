@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"chainledger/config"
-	"chainledger/db"
-	"chainledger/ingestion"
-	"chainledger/server"
+	"github.com/lexyblazy/chainledger/config"
+	"github.com/lexyblazy/chainledger/db"
+	"github.com/lexyblazy/chainledger/ingestion"
+	"github.com/lexyblazy/chainledger/server"
 )
 
 func main() {

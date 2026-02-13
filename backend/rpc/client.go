@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"chainledger/config"
+	"github.com/lexyblazy/chainledger/config"
 )
 
 type Client struct {

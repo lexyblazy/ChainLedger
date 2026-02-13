@@ -1,8 +1,8 @@
 package server
 
 import (
-	"chainledger/db"
-	"chainledger/ingestion"
+	"github.com/lexyblazy/chainledger/db"
+	"github.com/lexyblazy/chainledger/ingestion"
 )
 
 type GetStatusResponse struct {

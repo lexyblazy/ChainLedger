@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"chainledger/config"
-	"chainledger/db"
-	addrUtil "chainledger/internal/address"
-	"chainledger/internal/hex"
-	"chainledger/rpc"
+	"github.com/lexyblazy/chainledger/config"
+	"github.com/lexyblazy/chainledger/db"
+	addrUtil "github.com/lexyblazy/chainledger/internal/address"
+	"github.com/lexyblazy/chainledger/internal/hex"
+	"github.com/lexyblazy/chainledger/rpc"
 )
 
 type NetworkWorker struct {

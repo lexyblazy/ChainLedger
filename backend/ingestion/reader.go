@@ -6,10 +6,10 @@ import (
 	"sync"
 
 	"encoding/json"
-	"chainledger/config"
-	"chainledger/db"
-	"chainledger/internal/hex"
-	"chainledger/rpc"
+	"github.com/lexyblazy/chainledger/config"
+	"github.com/lexyblazy/chainledger/db"
+	"github.com/lexyblazy/chainledger/internal/hex"
+	"github.com/lexyblazy/chainledger/rpc"
 )
 
 type NetworkReader struct {

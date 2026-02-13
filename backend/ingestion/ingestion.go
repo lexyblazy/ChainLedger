@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"sync"
 
-	"chainledger/config"
-	"chainledger/db"
+	"github.com/lexyblazy/chainledger/config"
+	"github.com/lexyblazy/chainledger/db"
 )
 
 type IngestionService struct {

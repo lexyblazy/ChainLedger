@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"chainledger/config"
-	"chainledger/db"
-	"chainledger/ingestion"
+	"github.com/lexyblazy/chainledger/config"
+	"github.com/lexyblazy/chainledger/db"
+	"github.com/lexyblazy/chainledger/ingestion"
 )
 
 type Server struct {

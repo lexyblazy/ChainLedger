@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"chainledger/db"
-	addrUtil "chainledger/internal/address" // address utility functions
+	"github.com/lexyblazy/chainledger/db"
+	addrUtil "github.com/lexyblazy/chainledger/internal/address" // address utility functions
 )
 
 func (s *Server) getOffsetPaginationParams(r *http.Request) (limit int, offset int, err error) {

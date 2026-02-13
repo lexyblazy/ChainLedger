@@ -1,4 +1,4 @@
-module chainledger
+module github.com/lexyblazy/chainledger
 
 go 1.24.4
 
