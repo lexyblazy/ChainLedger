@@ -25,6 +25,8 @@ import { useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 function PortfolioSummary({ assets }: { assets: Portfolio[] }) {
   const nativeAsset = assets.find((a) => a.asset_type === "native");
@@ -146,9 +148,15 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto">
-      <div className="text-sm text-muted-foreground">Wallet</div>
+      <Link
+        href={`/dashboard/wallets`}
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Wallets
+      </Link>
       <div className="flex justify-between">
-        <div className="font-mono text-sm">{address}</div>
+        <div className="font-mono text-sm">Wallet: {address}</div>
         <Badge variant="secondary">{chainMeta?.name}</Badge>
       </div>
       <div className="flex items-center justify-between">
@@ -201,16 +209,28 @@ export default function PortfolioPage() {
                 return (
                   <TableRow key={asset.asset_address}>
                     <TableCell>
-                      <div className="font-semibold text-sm">
-                        {displaySymbol}
-                      </div>
-                      <div className="text-xs text-muted-foreground font-mono">
+                      <Link
+                        href={{
+                          pathname: "/dashboard/snapshots",
+                          query: {
+                            address,
+                            chainId,
+                            tokenAddress: asset.asset_address,
+                            decimals: asset.decimals,
+                          },
+                        }}
+                        className="block hover:opacity-80 transition"
+                      >
+                        <div className="font-semibold text-sm hover:underline">
+                          {displaySymbol}
+                        </div>
+
                         {asset.asset_type !== "native" && (
                           <div className="text-xs text-muted-foreground font-mono">
                             {asset.asset_address}
                           </div>
                         )}
-                      </div>
+                      </Link>
                     </TableCell>
 
                     <TableCell className="text-xs text-muted-foreground">
