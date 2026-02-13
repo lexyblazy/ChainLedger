@@ -44,7 +44,18 @@ func (s *Server) getOffsetPaginationParams(r *http.Request) (limit int, offset i
 }
 
 func (s *Server) getCursorPaginationParams(r *http.Request, cursorName string) (limit int, cursor interface{}) {
-	limit = s.config.Api.MaxResults
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr == "" {
+		limit = s.config.Api.MaxResults
+	} else {
+		limitInt, err := strconv.Atoi(limitStr)
+		if err != nil {
+			return 0, nil
+		}
+		limit = limitInt
+	}
+
+	limit = min(limit, s.config.Api.MaxResults)
 
 	return limit, r.URL.Query().Get(cursorName)
 }
@@ -232,9 +243,11 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 
 	if addrUtil.IsNativeAsset(tokenAddress) {
 		query += " AND asset_address = 'native'"
+		tokenAddress = "native"
 	} else if addrUtil.IsValidLength(tokenAddress) {
 		query += fmt.Sprintf(" AND asset_address = %s", fmt.Sprintf("$%d", len(params)+1))
-		params = append(params, addrUtil.Normalize(tokenAddress))
+		tokenAddress = addrUtil.Normalize(tokenAddress)
+		params = append(params, tokenAddress)
 	} else {
 		return nil, http.StatusBadRequest, errors.New("token_address is required and must be a valid address")
 	}
@@ -268,6 +281,29 @@ func (s *Server) getWalletBalanceSnapshots(r *http.Request) (any, int, error) {
 
 	if err := rows.Err(); err != nil {
 		return nil, http.StatusInternalServerError, err
+	}
+
+	if tokenAddress == "native" {
+
+		nativeToken := s.config.Networks[chainID].NativeToken
+		decimals := int8(nativeToken.Decimals)
+		response.Data.TokenMetadata = TokenMetadata{
+			Symbol:   &nativeToken.Symbol,
+			Name:     &nativeToken.Name,
+			Decimals: &decimals,
+		}
+	} else {
+		tokenMetadata := db.TokenEntity{}
+		err = s.db.Pool().QueryRow(r.Context(), "SELECT symbol, name, decimals FROM tokens WHERE chain_id = $1 AND token_address = $2", chainID, tokenAddress).Scan(&tokenMetadata.Symbol, &tokenMetadata.Name, &tokenMetadata.Decimals)
+		if err != nil {
+			return nil, http.StatusInternalServerError, err
+		}
+
+		response.Data.TokenMetadata = TokenMetadata{
+			Symbol:   tokenMetadata.Symbol,
+			Name:     tokenMetadata.Name,
+			Decimals: tokenMetadata.Decimals,
+		}
 	}
 
 	response.Data.BalanceSnapshots = balanceSnapshots
@@ -343,12 +379,12 @@ ORDER BY
 		}
 
 		if p.Symbol == nil {
-			nativeSymbol := s.config.Networks[strconv.Itoa(chainID)].Symbol
+			nativeSymbol := s.config.Networks[strconv.Itoa(chainID)].NativeToken.Symbol
 			p.Symbol = &nativeSymbol
 		}
 
 		if p.Decimals == nil {
-			nativeDecimals := int8(s.config.Networks[strconv.Itoa(chainID)].Decimals)
+			nativeDecimals := int8(s.config.Networks[strconv.Itoa(chainID)].NativeToken.Decimals)
 			p.Decimals = &nativeDecimals
 		}
 
