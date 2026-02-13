@@ -21,7 +21,7 @@ import { Portfolio, PortfolioResponse } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { CHAINS } from "@/lib/constants";
 import { PaginationControls } from "@/components/pagination-controls";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -88,7 +88,7 @@ function PortfolioSummary({ assets }: { assets: Portfolio[] }) {
   );
 }
 
-export default function PortfolioPage() {
+function PortfolioPageInner() {
   const searchParams = useSearchParams();
 
   const address = searchParams.get("address");
@@ -263,5 +263,13 @@ export default function PortfolioPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function PortfolioPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <PortfolioPageInner />
+    </Suspense>
   );
 }

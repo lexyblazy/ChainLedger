@@ -20,15 +20,16 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { useInfiniteQuery, InfiniteData } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { makeRequest } from "@/lib/api";
 import { BalanceSnapshotsResponse } from "@/lib/types";
 import { formatTokenBalance } from "@/lib/format";
+import { LoadingState } from "@/components/loading-state";
 
-export default function SnapshotPage() {
+function SnapshotPageInner() {
   const searchParams = useSearchParams();
 
   const address = searchParams.get("address");
@@ -310,5 +311,13 @@ export default function SnapshotPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SnapshotPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <SnapshotPageInner />
+    </Suspense>
   );
 }
