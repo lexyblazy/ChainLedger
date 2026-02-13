@@ -53,3 +53,18 @@ export interface Portfolio {
   symbol: string;
   decimals: number;
 }
+
+export interface TokensResponse {
+  data: {
+    tokens: Token[];
+  };
+  meta: OffsetPaginationMeta;
+}
+
+export interface Token {
+  chain_id: number;
+  token_address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+}
