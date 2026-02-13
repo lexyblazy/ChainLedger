@@ -36,8 +36,6 @@ function SnapshotPageInner() {
   const chainId = searchParams.get("chainId");
   const tokenAddress = searchParams.get("tokenAddress") ?? "native";
 
-  let decimals = 18;
-
   const enabled = Boolean(address && chainId);
 
   /* ------------------------------------------------------------------ */
@@ -73,6 +71,23 @@ function SnapshotPageInner() {
   });
 
   /* ------------------------------------------------------------------ */
+  /*  Token Metadata (must be derived before normalization)             */
+  /* ------------------------------------------------------------------ */
+
+  const tokenMetadata = useMemo(() => {
+    if (!data?.pages?.length) return null;
+    return data.pages[0].data.token_metadata ?? null;
+  }, [data]);
+
+  const symbol = tokenMetadata?.symbol ?? "TOKEN";
+
+  const decimals =
+    typeof tokenMetadata?.decimals === "number" &&
+    Number.isFinite(tokenMetadata.decimals)
+      ? tokenMetadata.decimals
+      : 18;
+
+  /* ------------------------------------------------------------------ */
   /*  Flatten + Normalize                                               */
   /* ------------------------------------------------------------------ */
 
@@ -94,15 +109,6 @@ function SnapshotPageInner() {
       };
     });
   }, [data, decimals]);
-
-  const tokenMetadata = useMemo(() => {
-    if (!data?.pages?.length) return null;
-
-    return data.pages[0].data.token_metadata ?? null;
-  }, [data]);
-
-  const symbol = tokenMetadata?.symbol ?? "TOKEN";
-  decimals = tokenMetadata?.decimals ?? 18;
 
   /* ------------------------------------------------------------------ */
   /*  Autoscale Logic                                                   */

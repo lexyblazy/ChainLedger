@@ -53,13 +53,7 @@ export function WalletUpsertDialog({
       setLabel("");
       setEntityType("");
     }
-  }, [wallet, open]);
-
-  useEffect(() => {
-    if (open) {
-      mutation.reset();
-    }
-  }, [open]);
+  }, [wallet]);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -80,6 +74,12 @@ export function WalletUpsertDialog({
       setOpen(false);
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      mutation.reset();
+    }
+  }, [open, mutation]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
