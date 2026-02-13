@@ -78,7 +78,7 @@ CREATE TABLE balances (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     PRIMARY KEY (chain_id, wallet_address, asset_type, asset_address)
-)
+);
 
 -- Balance snapshots
 CREATE TABLE balance_snapshots (
@@ -104,7 +104,7 @@ CREATE UNIQUE INDEX balance_snapshot_unique_idx ON balance_snapshots (
         asset_type,
         asset_address,
         block_number
-    )
+    );
 
 -- Latest snapshot per address / asset
 CREATE INDEX balance_snapshots_latest_idx ON balance_snapshots (
@@ -125,5 +125,4 @@ CREATE INDEX balance_snapshots_time_idx ON balance_snapshots (
 --
 CREATE INDEX balance_snapshots_wallet_address_chain_id_id_desc_idx ON balance_snapshots (wallet_address, chain_id, id DESC);
 
-CREATE INDEX balance_snapshots_wallet_chain_asset_id_desc
-ON balance_snapshots (wallet_address, chain_id, asset_address, id DESC);
+CREATE INDEX balance_snapshots_wallet_chain_asset_id_desc ON balance_snapshots (wallet_address, chain_id, asset_address, id DESC);
