@@ -18,12 +18,18 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	config, err := config.LoadConfig("config.json")
+	config, err := config.LoadConfig("./config.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db, err := db.NewDB(config.DatabaseURL)
+	dbUrl := os.Getenv("DATABASE_URL")
+	if dbUrl == "" {
+		dbUrl = config.DatabaseURL
+		log.Println("DATABASE_URL is not set, using default from config.json")
+	}
+
+	db, err := db.NewDB(dbUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
