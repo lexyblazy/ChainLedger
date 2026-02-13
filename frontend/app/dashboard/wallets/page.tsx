@@ -22,6 +22,7 @@ import { WalletUpsertDialog } from "@/components/wallet-upsert-dialog";
 import { useRouter } from "next/navigation";
 import { PaginationControls } from "@/components/pagination-controls";
 import { formatDate } from "@/lib/format";
+import Link from "next/link";
 
 const chains = Object.values(CHAINS);
 
@@ -113,7 +114,12 @@ export default function WalletsPage() {
                   }
                 >
                   <TableCell className="font-mono text-xs text-muted-foreground">
-                    {wallet.address}
+                    <Link
+                      href={`/dashboard/portfolio?address=${wallet.address}&chainId=${wallet.chain_id}`}
+                      className="font-mono underline underline-offset-4"
+                    >
+                      {wallet.address}
+                    </Link>
                   </TableCell>
                   <TableCell className="py-2 text-xs">{wallet.label}</TableCell>
                   <TableCell className="py-2 text-xs text-muted-foreground">
