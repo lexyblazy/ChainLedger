@@ -9,8 +9,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5433:5432" # local access only
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
       interval: 3s
@@ -51,6 +49,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - polychain_net
     ports:
@@ -72,6 +72,35 @@ services:
       - polychain_net
     ports:
       - "127.0.0.1:3000:3000"
+  
+  backup:
+    image: postgres:16.2-alpine
+    container_name: polychain_backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command: -c '
+      while true; do
+        echo "Running backup...";
+        PGPASSWORD=$POSTGRES_PASSWORD pg_dump
+          -h db
+          -U $POSTGRES_USER
+          -d $POSTGRES_DB
+          -F c
+          -f /backups/backup_$(date +%Y%m%d_%H%M%S).dump;
+        echo "Backup complete.";
+        find /backups -type f -mtime +7 -delete;
+        sleep 86400;
+      done'
+    networks:
+      - polychain_net
+
 
 volumes:
   postgres_data:
