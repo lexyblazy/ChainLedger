@@ -20,8 +20,6 @@ import {
 const navItems = [
   { title: "Status", href: "/dashboard/status" },
   { title: "Wallets", href: "/dashboard/wallets" },
-  { title: "Portfolio", href: "/dashboard/portfolio" },
-  { title: "Snapshots", href: "/dashboard/snapshots" },
   { title: "Tokens", href: "/dashboard/tokens" },
 ];
 
