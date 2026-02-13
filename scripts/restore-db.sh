@@ -37,7 +37,7 @@ docker compose exec db sh -c 'createdb -U $POSTGRES_USER $POSTGRES_DB'
 
 echo "Restoring from backup..."
 cat backups/$BACKUP_FILE | docker compose exec -T db sh -c \
-'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB'
+'pg_restore --no-owner --no-privileges -U $POSTGRES_USER -d $POSTGRES_DB'
 
 
 echo "Starting api and worker..."
