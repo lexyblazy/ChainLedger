@@ -8,7 +8,6 @@ import (
 
 	"polychain.capital/config"
 	"polychain.capital/db"
-	"polychain.capital/rpc"
 )
 
 type IngestionService struct {
@@ -18,19 +17,44 @@ type IngestionService struct {
 	WorkerErrors map[int]chan error
 }
 
+type StatusReader struct {
+	db        *db.DB
+	config    *config.Config
+	nwReaders map[int]*NetworkReader
+}
+
+// exposes a read only layer of the ingestion service
+func NewStatusReader(db *db.DB, config *config.Config) *StatusReader {
+
+	nwReaders := make(map[int]*NetworkReader)
+
+	for _, netCfg := range config.Networks {
+		network := netCfg
+		nwReader := NewNetworkReader(db, &network)
+		nwReaders[network.ChainID] = nwReader
+	}
+
+	return &StatusReader{
+		db:        db,
+		config:    config,
+		nwReaders: nwReaders,
+	}
+}
+
+// exposes the full ingestion service (worker + reader)
 func New(db *db.DB, config *config.Config) *IngestionService {
 	workers := make(map[int]*NetworkWorker)
 	workerErrors := make(map[int]chan error)
 
 	for _, netCfg := range config.Networks {
 		network := netCfg
+		nr := NewNetworkReader(db, &network)
 		workers[network.ChainID] = &NetworkWorker{
 			db:         db,
-			rpcc:       rpc.New(&network),
 			config:     &network,
 			addressSet: make(map[string]bool),
+			nr:         nr,
 		}
-
 		workerErrors[network.ChainID] = make(chan error, 1)
 
 	}
@@ -69,7 +93,7 @@ func (s *IngestionService) Cleanup(ctx context.Context) {
 
 }
 
-func (s *IngestionService) GetStatus(ctx context.Context) (map[string]NetworkStatus, error) {
+func (s *StatusReader) GetStatus(ctx context.Context) (map[string]NetworkStatus, error) {
 	status := make(map[string]NetworkStatus)
 
 	var (
@@ -77,19 +101,19 @@ func (s *IngestionService) GetStatus(ctx context.Context) (map[string]NetworkSta
 		mu sync.Mutex
 	)
 
-	for _, nw := range s.nw {
+	for _, nwReader := range s.nwReaders {
 		wg.Add(1)
-		go func(nw *NetworkWorker) {
+		go func(nr *NetworkReader) {
 			defer wg.Done()
-			networkStatus, err := nw.getStatus(ctx)
+			networkStatus, err := nr.getStatus(ctx)
 			if err != nil {
-				log.Println("Error getting status for", nw.config.Name, "ingestion worker", err)
+				log.Println("Error getting status for", nr.config.Name, "ingestion worker", err)
 				return
 			}
 			mu.Lock()
-			status[strconv.Itoa(nw.config.ChainID)] = networkStatus
+			status[strconv.Itoa(nr.config.ChainID)] = networkStatus
 			mu.Unlock()
-		}(nw)
+		}(nwReader)
 	}
 
 	wg.Wait()
