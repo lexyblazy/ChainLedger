@@ -15,6 +15,15 @@ import (
 )
 
 func main() {
+
+	if len(os.Args) < 2 {
+		log.Fatal("mode required: api | worker")
+	}
+	mode := os.Args[1]
+	if mode != "api" && mode != "worker" {
+		log.Fatal("Invalid mode")
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
@@ -35,17 +44,41 @@ func main() {
 	}
 	defer db.Close()
 
-	ingestion := ingestion.New(db, config)
-	server := server.New(db, config, ingestion)
+	switch mode {
+	case "api":
+		runApi(ctx, db, config)
+	case "worker":
+		runWorker(ctx, db, config)
+	default:
+		log.Fatal("Invalid mode", mode)
+	}
+}
+
+func runApi(ctx context.Context, db *db.DB, config *config.Config) {
+	statusReader := ingestion.NewStatusReader(db, config)
+	server := server.New(db, config, statusReader)
 
 	// Start the server in a goroutine
 	go func(c context.Context) {
 		server.Start(c)
 	}(ctx)
 
+	<-ctx.Done()
+
+	shutDownWithTimeout(ctx, time.Duration(config.ShutdownTimeoutSeconds)*time.Second, func(ctx context.Context) {
+		// simulate some cleanup work here
+		time.Sleep(1 * time.Second)
+	})
+
+}
+
+func runWorker(ctx context.Context, db *db.DB, config *config.Config) {
+
+	engine := ingestion.New(db, config)
+
 	// Start the ingestion service in a goroutine
 	go func(c context.Context) {
-		err := ingestion.Start(c)
+		err := engine.Start(c)
 		if err != nil {
 			log.Println("Error starting ingestion service", err)
 		}
@@ -53,14 +86,17 @@ func main() {
 
 	<-ctx.Done()
 
+	shutDownWithTimeout(ctx, time.Duration(config.ShutdownTimeoutSeconds)*time.Second, engine.Cleanup)
+}
+
+func shutDownWithTimeout(ctx context.Context, timeout time.Duration, cleanup func(ctx context.Context)) {
 	// optional shutdown with timeout
-	timeout := time.Duration(config.ShutdownTimeoutSeconds) * time.Second
 	timeoutCtx, timeoutCancel := context.WithTimeout(context.Background(), timeout)
 	defer timeoutCancel()
 
 	done := make(chan struct{})
 	go func() {
-		ingestion.Cleanup(timeoutCtx)
+		cleanup(timeoutCtx)
 		close(done)
 	}()
 
@@ -71,5 +107,4 @@ func main() {
 	case <-done:
 		log.Println("Graceful shutdown completed")
 	}
-
 }
