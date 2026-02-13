@@ -1,34 +1,61 @@
 # Polychain-Style Multichain Accounting & Reporting System
 
-A **fund-grade, multichain crypto accounting and reporting system** built as a targeted engineering application for **Polychain Capital**.
+A **fund-grade, multichain crypto accounting and reporting backend** designed to reflect the operational needs of **Polychain Capital**.
 
-This project demonstrates how to ingest on-chain asset data across multiple networks, normalize it into accounting-friendly relational models, and expose portfolio and historical balance views suitable for **internal fund operations, reporting, and exposure analysis**.
+This project demonstrates how to ingest on-chain activity across multiple EVM networks, normalize it into deterministic relational models, and expose portfolio and historical balance views suitable for **internal fund operations, reporting, and exposure analysis**.
 
 ---
 
-## Why This Project Exists
+## Purpose
 
 Polychain’s accounting and asset operations require:
 
-* reliable extraction of on-chain activity
-* consistent normalization across chains
-* deterministic portfolio state
-* historical balance tracking for reporting
-* SQL-friendly access for dashboards and analysis tools
+* Reliable extraction of on-chain activity
+* Deterministic portfolio state
+* Historical balance tracking
+* SQL-friendly access for reporting and dashboards
+* Operational resilience under RPC constraints
 
-This project is intentionally scoped to reflect those needs — **not** to build a public explorer or trading system.
+This project intentionally models those constraints.
+It is not a block explorer or trading system.
 
 ---
 
-## What This Demonstrates (Polychain-Relevant)
+## What This Demonstrates
 
-* Fund-grade on-chain data ingestion
-* Multichain asset normalization (EVM)
-* Address-scoped portfolio accounting
-* Separation of ledger data vs derived state
-* Historical balance snapshots for reporting
-* Operational realism (RPC limits, head lag, retries)
-* SQL-first design for internal dashboards (Retool / React)
+* Multichain EVM ingestion (Ethereum Mainnet, Base)
+* Address-scoped indexing and portfolio accounting
+* Separation of raw ledger data vs derived balance state
+* Deterministic historical balance snapshots
+* Operational realism (RPC rate limits, head lag, retries)
+* Worker/API separation (write model vs read model)
+* Dockerized, reproducible infrastructure
+* Backup + restore workflow validation
+
+---
+
+## System Architecture
+
+```
+Frontend (Next.js)
+        ↓
+API Container (Go - read layer)
+        ↓
+Postgres
+        ↑
+Worker Container (Go - ingestion engine)
+        ↑
+RPC Providers (per chain)
+```
+
+Key characteristics:
+
+* One worker per configured network (chain-scoped goroutines)
+* Deterministic block-based ingestion
+* Config-driven per-chain behavior
+* SQL-first schema optimized for internal dashboards
+* Stateless API layer
+* Graceful shutdown and retry handling
 
 ---
 
@@ -37,13 +64,14 @@ This project is intentionally scoped to reflect those needs — **not** to build
 ```
 /
 ├── backend/        # Go + Postgres ingestion & reporting API
-│   ├── README.md   # Backend architecture, data model, and ingestion strategy
+│   ├── README.md   # Backend architecture and ingestion design
 │   └── ...
 │
 ├── frontend/       # Next.js reporting dashboard
 │   ├── README.md   # Frontend architecture and UI scope
 │   └── ...
 │
+├── INFRA.md        # Docker, deployment, backup, restore workflow
 └── README.md       # (this file)
 ```
 
@@ -51,98 +79,121 @@ Each component is intentionally decoupled and can be evaluated independently.
 
 ---
 
-## System Overview
+## Backend Overview (Primary Focus)
 
-### Backend (Core of the Project)
+The backend models a fund-grade accounting ingestion system:
 
-The backend is the primary focus and mirrors how a **fund-grade accounting backend** would be structured.
-
-Key characteristics:
-
-* Multichain ingestion (Ethereum Mainnet, Base)
-* One worker per network (chain-scoped)
-* Sequential block processing
-* Address-scoped indexing
-* Deterministic balance computation
+* Multichain ingestion workers
+* Per-chain configurable RPC limits and retry policies
+* Block-gap finality buffer
+* Idempotent processing
+* Derived balance tables
 * Historical balance snapshots
-* SQL-friendly reporting tables
-* Read-only APIs for internal dashboards
+* Read-only reporting APIs
 
-Detailed design is documented in **`/backend/README.md`**.
+The backend implements a lightweight CQRS-style separation:
 
----
+* Worker = write model (block ingestion, balance updates)
+* API = read model (portfolio, snapshots, ingestion status)
+* NetworkReader = abstraction over RPC + DB reads
+* RPC client = transport layer (rate limiting + retry)
 
-### Frontend (Reporting Interface)
-
-The frontend consumes backend APIs to present:
-
-* wallet portfolios
-* historical balance charts
-* network ingestion status
-
-It is intentionally thin and depends entirely on backend correctness.
-
-Details live in **`/frontend/README.md`**.
+See `/backend/README.md` for detailed design.
 
 ---
 
-## Design Philosophy
+## Frontend Overview
 
-This project follows principles aligned with Polychain’s operational needs:
+The frontend provides:
 
-* **Ledger first, state second**
-  Raw on-chain data is immutable; balances are derived.
+* Wallet portfolio views
+* Historical balance charts
+* Network ingestion status
 
-* **Determinism over freshness**
-  Block-based ingestion and snapshots, not time-based heuristics.
+It is intentionally thin and fully dependent on backend correctness.
 
-* **Chain isolation**
-  All data is explicitly scoped by `chain_id`.
-
-* **Operational realism**
-  RPC rate limits, head lag, and provider quirks are handled explicitly.
-
-* **Minimal dependencies**
-  Go stdlib for HTTP, Postgres for reporting, pgx for DB access.
+See `/frontend/README.md`.
 
 ---
 
-## Intended Use
+## Infrastructure
 
-This system is designed to serve as:
+The system is fully containerized and reproducible.
 
-* a foundation for internal portfolio dashboards
-* a backend for accounting and reporting tools
-* a base layer for exposure and vesting analysis
+On a fresh machine:
 
-It is **not** intended for:
+```bash
+git clone <repo>
+cd <repo>
+cp .env.example .env
+# provide config.json
+./start-dev.sh
+```
 
-* trading or execution
-* price discovery
-* public APIs
-* real-time market data
+If this runs successfully, the system is fully reproducible.
+
+Details on deployment, backups, and restore procedures are documented in `INFRA.md`.
+
+---
+
+## Design Principles
+
+**Ledger First, State Second**
+Raw on-chain events are immutable; balances are derived.
+
+**Determinism Over Freshness**
+Blocks are processed sequentially with a configurable finality gap.
+
+**Chain Isolation**
+All data is explicitly scoped by `chain_id`.
+
+**Operational Realism**
+RPC rate limits, retries, head lag, and provider instability are handled explicitly.
+
+**Minimal Dependencies**
+Go (stdlib + pgx), Postgres, Docker.
+
+---
+
+## Intended Scope
+
+Designed for:
+
+* Internal portfolio dashboards
+* Accounting and reporting backends
+* Exposure and historical analysis
+
+Not designed for:
+
+* Trading or execution
+* Real-time price feeds
+* Public APIs
+* Market data aggregation
 
 ---
 
 ## Status
 
-* Backend ingestion & APIs: **complete**
-* Multichain ingestion: **validated**
-* Portfolio and snapshot reporting: **complete**
-* Frontend dashboard: **in progress / planned**
-* Additional chains and data sources can be added incrementally
+* Backend ingestion & APIs: **Complete**
+* Multichain ingestion: **Validated**
+* API/Worker separation: **Complete**
+* Infrastructure reproducibility: **Validated**
+* Backup & restore workflow: **Tested**
+* Frontend reporting interface: **In progress**
 
 ---
 
-## How to Review This Project
+## How to Review
 
 For Polychain reviewers:
 
-1. Start with **`/backend/README.md`**
+1. Start with `/backend/README.md`
 2. Review ingestion flow and schema design
 3. Review portfolio and snapshot modeling
-4. Skim frontend for reporting usage
-5. Ignore polish — focus on correctness and architecture
+4. Review infrastructure in `INFRA.md`
+5. Skim frontend for reporting usage
+
+Focus on correctness, determinism, and operational structure.
 
 ---
 
