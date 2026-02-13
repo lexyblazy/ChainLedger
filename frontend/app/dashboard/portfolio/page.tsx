@@ -216,7 +216,6 @@ export default function PortfolioPage() {
                             address,
                             chainId,
                             tokenAddress: asset.asset_address,
-                            decimals: asset.decimals,
                           },
                         }}
                         className="block hover:opacity-80 transition"

@@ -68,3 +68,30 @@ export interface Token {
   name: string;
   decimals: number;
 }
+
+export interface BalanceSnapshotsResponse {
+  data: {
+    balance_snapshots: BalanceSnapshot[];
+    token_metadata: {
+      symbol: string;
+      name: string;
+      decimals: number;
+    };
+  };
+  meta: {
+    cursor_id: number;
+    limit: number;
+    has_more: boolean;
+  };
+}
+
+export interface BalanceSnapshot {
+  id: number;
+  chain_id: number;
+  wallet_address: string;
+  asset_type: string;
+  asset_address: string;
+  balance_raw: string;
+  block_number: number;
+  block_timestamp: string;
+}
