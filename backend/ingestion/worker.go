@@ -119,7 +119,22 @@ func (w *NetworkWorker) start(ctx context.Context, syncBlocks bool) error {
 	}
 
 	if len(w.addressSet) == 0 {
-		return errors.New("no addresses found")
+		log.Println("No addresses tracked — ingestion suspended")
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+	populateAddressSetLoop:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-ticker.C:
+				w.populateAddressSet(ctx)
+				if len(w.addressSet) > 0 {
+					break populateAddressSetLoop
+				}
+			}
+		}
 	}
 
 	retryDelay := time.Duration(w.config.SyncWorker.RetryDelayMs) * time.Millisecond
