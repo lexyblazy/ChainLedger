@@ -2,7 +2,7 @@
 
 set -e
 
-echo "Starting Polychain (DEV mode)..."
+echo "Starting ChainLedger (DEV mode)..."
 
 docker compose \
   -f docker-compose.yml \
