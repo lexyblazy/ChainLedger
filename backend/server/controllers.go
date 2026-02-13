@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"polychain.capital/db"
-	addrUtil "polychain.capital/internal/address" // address utility functions
+	"chainledger/db"
+	addrUtil "chainledger/internal/address" // address utility functions
 )
 
 func (s *Server) getOffsetPaginationParams(r *http.Request) (limit int, offset int, err error) {

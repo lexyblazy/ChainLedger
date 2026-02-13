@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Polychain Capital",
-  description: "Polychain Capital - Dashboard",
+  title: "ChainLedger",
+  description: "ChainLedger - Dashboard",
 };
 
 export default function RootLayout({

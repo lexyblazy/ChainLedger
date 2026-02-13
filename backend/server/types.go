@@ -1,8 +1,8 @@
 package server
 
 import (
-	"polychain.capital/db"
-	"polychain.capital/ingestion"
+	"chainledger/db"
+	"chainledger/ingestion"
 )
 
 type GetStatusResponse struct {

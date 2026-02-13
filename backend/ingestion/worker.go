@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"polychain.capital/config"
-	"polychain.capital/db"
-	addrUtil "polychain.capital/internal/address"
-	"polychain.capital/internal/hex"
-	"polychain.capital/rpc"
+	"chainledger/config"
+	"chainledger/db"
+	addrUtil "chainledger/internal/address"
+	"chainledger/internal/hex"
+	"chainledger/rpc"
 )
 
 type NetworkWorker struct {

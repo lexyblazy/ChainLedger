@@ -1,4 +1,4 @@
-module polychain.capital
+module chainledger
 
 go 1.24.4
 

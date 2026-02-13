@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"polychain.capital/config"
-	"polychain.capital/db"
-	"polychain.capital/ingestion"
-	"polychain.capital/server"
+	"chainledger/config"
+	"chainledger/db"
+	"chainledger/ingestion"
+	"chainledger/server"
 )
 
 func main() {

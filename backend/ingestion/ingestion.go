@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"sync"
 
-	"polychain.capital/config"
-	"polychain.capital/db"
+	"chainledger/config"
+	"chainledger/db"
 )
 
 type IngestionService struct {

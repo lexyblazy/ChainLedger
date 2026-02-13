@@ -28,7 +28,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar {...props}>
-      <SidebarHeader className="font-semibold">Polychain Capital</SidebarHeader>
+      <SidebarHeader className="font-semibold">ChainLedger</SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>

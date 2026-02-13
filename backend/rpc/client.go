@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"polychain.capital/config"
+	"chainledger/config"
 )
 
 type Client struct {

@@ -6,10 +6,10 @@ import (
 	"sync"
 
 	"encoding/json"
-	"polychain.capital/config"
-	"polychain.capital/db"
-	"polychain.capital/internal/hex"
-	"polychain.capital/rpc"
+	"chainledger/config"
+	"chainledger/db"
+	"chainledger/internal/hex"
+	"chainledger/rpc"
 )
 
 type NetworkReader struct {
