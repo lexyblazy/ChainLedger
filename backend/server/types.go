@@ -40,9 +40,16 @@ type GetTokensResponse struct {
 	Meta OffsetPaginationMeta `json:"meta"`
 }
 
+type TokenMetadata struct {
+	Symbol   *string `json:"symbol"`
+	Name     *string `json:"name"`
+	Decimals *int8   `json:"decimals"`
+}
+
 type GetWalletBalanceSnapshotsResponse struct {
 	Data struct {
 		BalanceSnapshots []db.BalanceSnapshotEntity `json:"balance_snapshots"`
+		TokenMetadata    TokenMetadata              `json:"token_metadata"`
 	} `json:"data"`
 
 	Meta struct {
