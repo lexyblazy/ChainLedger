@@ -1,8 +1,8 @@
 # INFRA.md
 
-## Polychain Multichain Ingestion + API Infrastructure
+## Chain Ledger (Multichain Ingestion + API Infrastructure)
 
-This document describes how to run, deploy, migrate, back up, and restore the Polychain multichain ingestion system.
+This document describes how to run, deploy, migrate, back up, and restore the ChainLedger multichain ingestion system.
 
 The system is fully Dockerized and requires no local Go, Node, or Postgres installation.
 
@@ -24,12 +24,12 @@ RPC Providers (per chain)
 
 ### Containers
 
-* `polychain_db` → PostgreSQL database
-* `polychain_api` → REST API (read layer)
-* `polychain_worker` → Ingestion engine (write layer)
-* `polychain_frontend` → Next.js production build
-* `polychain_migrate` → One-shot DB migrations
-* `polychain_backup` → Automated daily DB backups
+- `chainledger_db` → PostgreSQL database
+- `chainledger_api` → REST API (read layer)
+- `chainledger_worker` → Ingestion engine (write layer)
+- `chainledger_frontend` → Next.js production build
+- `chainledger_migrate` → One-shot DB migrations
+- `chainledger_backup` → Automated daily DB backups
 
 ---
 
@@ -37,9 +37,9 @@ RPC Providers (per chain)
 
 Required:
 
-* Docker
-* Docker Compose (plugin version)
-* Git
+- Docker
+- Docker Compose (plugin version)
+- Git
 
 Nothing else is required locally.
 
@@ -54,15 +54,15 @@ Minimum required variables:
 ```
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=yourpassword
-POSTGRES_DB=polychain
-DATABASE_URL=postgres://postgres:yourpassword@db:5432/polychain?sslmode=disable
+POSTGRES_DB=chainledger
+DATABASE_URL=postgres://postgres:yourpassword@db:5432/chainledger?sslmode=disable
 NEXT_PUBLIC_API_URL=http://localhost:8080
 ```
 
 Notes:
 
-* `DATABASE_URL` must reference `db` as hostname (Docker network).
-* `NEXT_PUBLIC_API_URL` must point to the API service.
+- `DATABASE_URL` must reference `db` as hostname (Docker network).
+- `NEXT_PUBLIC_API_URL` must point to the API service.
 
 You may provide a `.env.example` in the repository.
 
@@ -78,18 +78,18 @@ Start everything:
 
 This will:
 
-* Build images
-* Start Postgres
-* Start API
-* Start Worker
-* Start Frontend
-* Bind ports locally
+- Build images
+- Start Postgres
+- Start API
+- Start Worker
+- Start Frontend
+- Bind ports locally
 
 Default exposed ports (dev override):
 
-* API → [http://localhost:8080](http://localhost:8080)
-* Frontend → [http://localhost:3000](http://localhost:3000)
-* Postgres → localhost:5433
+- API → [http://localhost:8080](http://localhost:8080)
+- Frontend → [http://localhost:3000](http://localhost:3000)
+- Postgres → localhost:5433
 
 Stop everything:
 
@@ -109,10 +109,10 @@ Start production stack:
 
 Production characteristics:
 
-* Postgres is NOT exposed publicly.
-* API binds to `127.0.0.1:8080`
-* Frontend binds to `127.0.0.1:3000`
-* Caddy (or reverse proxy) should proxy public traffic.
+- Postgres is NOT exposed publicly.
+- API binds to `127.0.0.1:8080`
+- Frontend binds to `127.0.0.1:3000`
+- Caddy (or reverse proxy) should proxy public traffic.
 
 Backups are stored on disk at:
 
@@ -134,19 +134,19 @@ docker compose run --rm migrate
 
 Migrations:
 
-* Are idempotent
-* Must run before API/Worker if schema changed
-* Should never be modified retroactively
+- Are idempotent
+- Must run before API/Worker if schema changed
+- Should never be modified retroactively
 
 ---
 
 # 7️⃣ Backup Strategy
 
-The `polychain_backup` container:
+The `chainledger_backup` container:
 
-* Runs every 12 hours `pg_dump`
-* Stores compressed custom-format dumps
-* Retains last 7 days
+- Runs every 12 hours `pg_dump`
+- Stores compressed custom-format dumps
+- Retains last 7 days
 
 Backup location:
 
@@ -181,71 +181,70 @@ Always test restore after modifying backup strategy.
 
 # 9️⃣ Service Responsibilities
 
-### polychain_api
+### chainledger_api
 
-* Runs in `api` mode
-* Stateless
-* Exposes REST endpoints
-* Depends on `NetworkReader`
-* Does NOT perform ingestion
-
----
-
-### polychain_worker
-
-* Runs in `worker` mode
-* Spins per-chain goroutines
-* Uses per-chain config
-* Respects block gap
-* Uses exponential backoff and retry
-* Writes to DB only
+- Runs in `api` mode
+- Stateless
+- Exposes REST endpoints
+- Depends on `NetworkReader`
+- Does NOT perform ingestion
 
 ---
 
-### polychain_db
+### chainledger_worker
 
-* Stores:
+- Runs in `worker` mode
+- Spins per-chain goroutines
+- Uses per-chain config
+- Respects block gap
+- Uses exponential backoff and retry
+- Writes to DB only
 
-  * Transfers
-  * Balances
-  * Snapshots
+---
+
+### chainledger_db
+
+- Stores:
+  - Transfers
+  - Balances
+  - Snapshots
 
 Never expose publicly.
 
 ---
 
-### polychain_migrate
+### chainledger_migrate
 
-* Applies SQL migrations
-* Runs once
-* Not long-running
-
----
-
-### polychain_backup
-
-* Performs bi-daily (every 12h) `pg_dump`
-* Prunes old backups
+- Applies SQL migrations
+- Runs once
+- Not long-running
 
 ---
 
-### polychain_frontend
+### chainledger_backup
 
-* Production Next.js build
-* Uses build-time `NEXT_PUBLIC_API_URL`
+- Performs bi-daily (every 12h) `pg_dump`
+- Prunes old backups
+
+---
+
+### chainledger_frontend
+
+- Production Next.js build
+- Uses build-time `NEXT_PUBLIC_API_URL`
 
 ---
 
 # 🔟 Operational Rules
 
-* Never modify database schema manually.
-* Always use migrations.
-* Never expose Postgres publicly.
-* Always test restore after changing backup config.
-* Worker must not mutate schema.
-* Reader layer must remain stateless.
-* RPC retries must remain in RPC client layer.
-* Shutdown uses independent timeout context intentionally.
+- Never modify database schema manually.
+- Always use migrations.
+- Never expose Postgres publicly.
+- Always test restore after changing backup config.
+- Worker must not mutate schema.
+- Reader layer must remain stateless.
+- RPC retries must remain in RPC client layer.
+- Shutdown uses independent timeout context intentionally.
 
 ---
 
@@ -272,15 +271,14 @@ This test should pass before production deployment.
 
 The system implements a lightweight CQRS pattern:
 
-* Worker = write model
-* API = read model
-* NetworkReader = abstraction layer
-* RPC client = transport + retry layer
+- Worker = write model
+- API = read model
+- NetworkReader = abstraction layer
+- RPC client = transport + retry layer
 
 Worker and API are isolated at container level.
 
-
-Each chain is independently configurable via `backend/config.json`. see  [config.example.json](/backend/config.example.json)
+Each chain is independently configurable via `backend/config.json`. see [config.example.json](/backend/config.example.json)
 
 Note: `backend/config.json` is a required artifact for the backend Worker and API containers.
 if unprovided, the container is killed via `log.Fatal`
@@ -291,11 +289,11 @@ if unprovided, the container is killed via `log.Fatal`
 
 Not currently required:
 
-* Blue/green deployments
-* Horizontal worker scaling
-* Distributed locking
-* Prometheus metrics
-* Multi-node ingestion
+- Blue/green deployments
+- Horizontal worker scaling
+- Distributed locking
+- Prometheus metrics
+- Multi-node ingestion
 
 Current design supports future evolution if required.
 
@@ -305,11 +303,10 @@ Current design supports future evolution if required.
 
 This system is designed to be:
 
-* Deterministic
-* Reproducible
-* Backup-safe
-* Operationally predictable
-* Container-native
+- Deterministic
+- Reproducible
+- Backup-safe
+- Operationally predictable
+- Container-native
 
 Changes to infrastructure should preserve these properties.
-

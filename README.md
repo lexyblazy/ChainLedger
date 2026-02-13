@@ -1,20 +1,20 @@
-# Polychain-Style Multichain Accounting & Reporting System
+# Deterministic Multichain Accounting & Reporting System
 
-A **fund-grade, multichain crypto accounting and reporting backend** designed to reflect the operational needs of **Polychain Capital**.
+A **fund-grade, multichain crypto accounting and reporting backend** that ingest on-chain activity across multiple EVM networks, normalize it into deterministic relational models, and expose portfolio and historical balance views suitable for internal reporting workflows.
 
-This project demonstrates how to ingest on-chain activity across multiple EVM networks, normalize it into deterministic relational models, and expose portfolio and historical balance views suitable for **internal fund operations, reporting, and exposure analysis**.
+This system prioritizes correctness, operational realism, and clear separation between raw ledger data and derived accounting state.
 
 ---
 
 ## Purpose
 
-Polychain’s accounting and asset operations require:
+Crypto funds and asset managers require:
 
 * Reliable extraction of on-chain activity
 * Deterministic portfolio state
 * Historical balance tracking
 * SQL-friendly access for reporting and dashboards
-* Operational resilience under RPC constraints
+* Infrastructure resilient to RPC constraints
 
 This project intentionally models those constraints.
 It is not a block explorer or trading system.
@@ -53,7 +53,7 @@ Key characteristics:
 * One worker per configured network (chain-scoped goroutines)
 * Deterministic block-based ingestion
 * Config-driven per-chain behavior
-* SQL-first schema optimized for internal dashboards
+* SQL-first schema optimized for reporting workflows and internal dashboards
 * Stateless API layer
 * Graceful shutdown and retry handling
 
@@ -81,7 +81,7 @@ Each component is intentionally decoupled and can be evaluated independently.
 
 ## Backend Overview (Primary Focus)
 
-The backend models a fund-grade accounting ingestion system:
+The backend models a production-style accounting ingestion system:
 
 * Multichain ingestion workers
 * Per-chain configurable RPC limits and retry policies
@@ -126,7 +126,7 @@ On a fresh machine:
 git clone <repo>
 cd <repo>
 cp .env.example .env
-# provide config.json in backend/config.json. See backend/config.example.json
+# provide config.json in backend/config.json (see backend/config.example.json)
 ./start-dev.sh
 ```
 
@@ -185,8 +185,6 @@ Not designed for:
 
 ## How to Review
 
-For Polychain reviewers:
-
 1. Start with `/backend/README.md`
 2. Review ingestion flow and schema design
 3. Review portfolio and snapshot modeling
@@ -199,5 +197,4 @@ Focus on correctness, determinism, and operational structure.
 
 ## License
 
-MIT / Demonstration Use
-
+MIT

@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16.2-alpine
-    container_name: polychain_db
+    container_name: chainledger_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -15,11 +15,11 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - polychain_net
+      - chainledger_net
 
   migrate:
     image: migrate/migrate:4
-    container_name: polychain_migrate
+    container_name: chainledger_migrate
     restart: "no"
     depends_on:
       db:
@@ -38,11 +38,11 @@ services:
         "up",
       ]
     networks:
-      - polychain_net
+      - chainledger_net
 
   api:
     build: ./backend
-    container_name: polychain_api
+    container_name: chainledger_api
     restart: unless-stopped
     command: ["./app", "api"]
     env_file:
@@ -53,13 +53,13 @@ services:
       migrate:
         condition: service_completed_successfully
     networks:
-      - polychain_net
+      - chainledger_net
     ports:
       - "127.0.0.1:8080:8080"
 
   worker:
     build: ./backend
-    container_name: polychain_worker
+    container_name: chainledger_worker
     restart: unless-stopped
     command: ["./app", "worker"]
     env_file:
@@ -70,14 +70,14 @@ services:
       migrate:
         condition: service_completed_successfully
     networks:
-      - polychain_net
+      - chainledger_net
 
   frontend:
     build: 
       context: ./frontend
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    container_name: polychain_frontend
+    container_name: chainledger_frontend
     restart: unless-stopped
     env_file:
       - .env
@@ -85,42 +85,42 @@ services:
     depends_on:
       - api
     networks:
-      - polychain_net
+      - chainledger_net
     ports:
       - "127.0.0.1:3000:3000"
   
-  backup:
-    image: postgres:16.2-alpine
-    container_name: polychain_backup
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./backups:/backups
-    entrypoint: ["/bin/sh", "-c"]
-    command: -c '
-      while true; do
-        echo "Running backup...";
-        PGPASSWORD=$POSTGRES_PASSWORD pg_dump
-          -h db
-          -U $POSTGRES_USER
-          -d $POSTGRES_DB
-          -F c
-          -f /backups/backup_$(date +%Y%m%d_%H%M%S).dump;
-        echo "Backup complete.";
-        find /backups -type f -mtime +7 -delete;
-        sleep 43200;
-      done'
-    networks:
-      - polychain_net
+  # backup:
+  #   image: postgres:16.2-alpine
+  #   container_name: chainledger_backup
+  #   restart: unless-stopped
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./backups:/backups
+  #   entrypoint: ["/bin/sh", "-c"]
+  #   command: -c '
+  #     while true; do
+  #       echo "Running backup...";
+  #       PGPASSWORD=$POSTGRES_PASSWORD pg_dump
+  #         -h db
+  #         -U $POSTGRES_USER
+  #         -d $POSTGRES_DB
+  #         -F c
+  #         -f /backups/backup_$(date +%Y%m%d_%H%M%S).dump;
+  #       echo "Backup complete.";
+  #       find /backups -type f -mtime +7 -delete;
+  #       sleep 43200;
+  #     done'
+  #   networks:
+  #     - chainledger_net
 
 
 volumes:
   postgres_data:
 
 networks:
-  polychain_net:
+  chainledger_net:
     driver: bridge
