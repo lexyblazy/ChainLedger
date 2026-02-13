@@ -15,10 +15,10 @@ type Server struct {
 	port   string
 	db     *db.DB
 	config *config.Config
-	i      *ingestion.IngestionService
+	i      *ingestion.StatusReader
 }
 
-func New(db *db.DB, config *config.Config, i *ingestion.IngestionService) *Server {
+func New(db *db.DB, config *config.Config, i *ingestion.StatusReader) *Server {
 	return &Server{port: config.Api.Port, db: db, config: config, i: i}
 }
 
