@@ -196,7 +196,7 @@ Always test restore after modifying backup strategy.
 * Runs in `worker` mode
 * Spins per-chain goroutines
 * Uses per-chain config
-* Respects block gap (`finality depth`)
+* Respects block gap
 * Uses exponential backoff and retry
 * Writes to DB only
 
@@ -249,7 +249,7 @@ Never expose publicly.
 
 ---
 
-# 11️⃣ Clean Reproducibility Test
+# 1️⃣1️⃣ Clean Reproducibility Test
 
 To validate infrastructure integrity:
 
@@ -268,7 +268,7 @@ This test should pass before production deployment.
 
 ---
 
-# 12️⃣ Architectural Notes
+# 1️⃣2️⃣ Architectural Notes
 
 The system implements a lightweight CQRS pattern:
 
@@ -279,13 +279,15 @@ The system implements a lightweight CQRS pattern:
 
 Worker and API are isolated at container level.
 
-Each chain is independently configurable via `backend/config.json`. see `backend/config.example.json`
-Note: `config.json` is a required artifact for the backend Worker and API containers.
+
+Each chain is independently configurable via `backend/config.json`. see  [config.example.json](/backend/config.example.json)
+
+Note: `backend/config.json` is a required artifact for the backend Worker and API containers.
 if unprovided, the container is killed via `log.Fatal`
 
 ---
 
-# 13️⃣ Future Extensions (Optional)
+# 1️⃣3️⃣ Future Extensions (Optional)
 
 Not currently required:
 

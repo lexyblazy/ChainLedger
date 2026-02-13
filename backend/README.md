@@ -1,8 +1,8 @@
 # Multichain Crypto Asset Ingestion & Portfolio Backend
 
-A **fund-grade, multichain backend system** for ingesting on-chain crypto asset data, normalizing it for accounting and reporting workflows, and exposing portfolio and exposure APIs for internal use.
+A **fund-grade, multichain backend system** for ingesting on-chain asset activity, normalizing it into deterministic relational models, and exposing portfolio and historical balance APIs for internal reporting.
 
-This project is a **targeted backend engineering application** aligned with Polychain’s Accounting and Reporting Systems, emphasizing correctness, determinism, and operational reliability over speculative features.
+The system prioritizes **correctness, determinism, and operational reliability** over feature breadth.
 
 ---
 
@@ -10,33 +10,35 @@ This project is a **targeted backend engineering application** aligned with Poly
 
 Crypto funds require:
 
-* reliable extraction of on-chain activity
-* consistent normalization across chains
-* queryable portfolio state
-* historical balance tracking
-* clear separation between raw ledger data and derived accounting views
+* Reliable extraction of on-chain activity
+* Deterministic portfolio state
+* Queryable historical balances
+* Clear separation between raw ledger data and derived accounting views
+* Infrastructure that tolerates RPC limits and instability
 
-This system is designed to serve as a **data foundation for portfolio monitoring, vesting analysis, and counterparty exposure**, not a public blockchain explorer.
+This backend is designed as a **data foundation for portfolio monitoring, reporting, and exposure analysis** — not a public explorer or trading engine.
 
 ---
 
 ## Scope & Guarantees
 
-**In scope**
+### In Scope
 
-* On-chain ingestion (EVM chains)
+* EVM chain ingestion
 * Address-scoped indexing
 * Deterministic balance computation
 * Historical balance snapshots
-* SQL-friendly reporting tables
-* Multichain support by design
+* SQL-optimized reporting schema
+* Multichain support via configuration
 
-**Explicitly out of scope**
+### Explicitly Out of Scope
 
 * Reorg-aware reconciliation
 * Price feeds / USD valuation
 * Trading or execution logic
-* Authentication & permissions
+* Authentication / authorization
+
+The system favors architectural clarity over speculative features.
 
 ---
 
@@ -44,132 +46,144 @@ This system is designed to serve as a **data foundation for portfolio monitoring
 
 * **Ethereum Mainnet**
 
-  * Historical backfill from a fixed start block
+  * Historical backfill from fixed start block
 * **Base**
 
   * Forward indexing near chain head
 
-Additional EVM networks (e.g. Arbitrum, Optimism) can be added with configuration only.
+Additional EVM networks can be added through configuration only.
 
 ---
 
-## System Architecture
+# System Architecture
 
-### Ingestion Layer
+The backend separates ingestion (write model) from read APIs (read model).
 
-* One **network worker per chain**
-* Sequential block ingestion
+```
+RPC Providers
+        ↓
+Network Worker (per chain)
+        ↓
+Postgres (Ledger + Derived State)
+        ↓
+Read API (stateless)
+```
+
+### Write Model (Ingestion)
+
+* One worker per configured network
+* Sequential block processing
 * Address-scoped filtering
-* Head-lag safety window to avoid unstable blocks
-* Rate-limit aware RPC access (token bucket + backoff)
-* Idempotent database writes
+* Configurable head-lag safety window
+* Rate-limit aware RPC client
+* Idempotent writes
+* Restart-safe
 
-The ingestion pipeline is designed to be:
-
-* predictable
-* restart-safe
-* provider-agnostic
-* cost-aware (especially on free RPC tiers)
+Each chain runs independently via configuration.
 
 ---
 
-### Storage & Normalization (Postgres)
+# Storage Model (Postgres)
 
-The database is organized into **three conceptual layers**.
+The schema is intentionally layered.
 
 ---
 
-### 1. Canonical Ledger (Append-Only)
+## 1️⃣ Canonical Ledger (Append-Only)
 
-These tables represent raw on-chain facts and are never mutated.
+Immutable on-chain facts:
 
 * `blocks`
 * `native_transfers`
 * `erc20_transfers`
 
-They form the immutable source of truth.
+These tables are never mutated and serve as the source of truth.
 
 ---
 
-### 2. Derived State (Current Balances)
+## 2️⃣ Derived State (Current Portfolio)
 
-#### `balances`
+### `balances`
 
 * One row per `(chain_id, wallet_address, asset_type, asset_address)`
-* Composite primary key (no surrogate ID)
-* Represents **current portfolio state**
-* Native assets use a sentinel `asset_address = 'native'`
-* Fully rebuildable from ledger data
+* Composite primary key
+* Represents current portfolio state
+* Native assets use sentinel `asset_address = 'native'`
+* Fully rebuildable from ledger
 
-This table exists to make portfolio queries fast and simple.
+Optimized for fast portfolio queries.
 
 ---
 
-### 3. Historical State (Snapshots)
+## 3️⃣ Historical State (Snapshots)
 
-#### `balance_snapshots`
+### `balance_snapshots`
 
 * Append-only
-* Periodic snapshots every N processed blocks
-* Cursor-based pagination via `BIGSERIAL id`
-* Designed for charts, reporting, and historical analysis
+* Block-based snapshot cadence
+* Cursor pagination via `BIGSERIAL id`
+* Deterministic ordering
+* Suitable for reporting and visualization
 
-Snapshot cadence is configurable and block-based (not wall-clock-based).
-
----
-
-### Supporting Tables
-
-* `tokens` — ERC-20 metadata (symbol, decimals)
-* `address_registry` — tracked addresses with optional labels (funds, protocols, counterparties)
+Snapshots are block-driven, not wall-clock driven.
 
 ---
 
-## Ingestion Strategy
+## Supporting Tables
 
-### Address-Scoped Indexing
-
-Only transactions and logs involving tracked addresses are persisted.
-This avoids unnecessary data growth and keeps the system aligned with fund-specific concerns.
+* `tokens` — ERC-20 metadata
+* `address_registry` — tracked addresses
 
 ---
 
-### Head Lag Safety Window
+# Ingestion Strategy
 
-The indexer maintains a configurable gap from the RPC head (e.g. 200–500 blocks):
+## Address-Scoped Indexing
 
-* avoids indexing unstable blocks
-* prevents RPC race conditions
-* removes the need for reorg handling within scope
+Only transactions involving tracked addresses are persisted.
 
----
-
-### RPC Rate Limiting
-
-* Token-bucket rate limiter per network
-* Designed to respect **account-wide RPC limits** (e.g. Alchemy free tier)
-* Conservative tuning to avoid 429s
-* Exponential backoff on transient failures
+This prevents unnecessary data growth and aligns ingestion with fund-specific exposure tracking.
 
 ---
 
-## API Surface
+## Head-Lag Safety Window
 
-The HTTP API is intentionally minimal and read-only, built using Go’s standard library.
+The worker maintains a configurable gap from RPC head (e.g., 200–500 blocks):
+
+* Avoids unstable blocks
+* Eliminates reorg handling within defined scope
+* Ensures deterministic state
 
 ---
 
-### Network Status
+## RPC Layer
+
+* Token-bucket rate limiting per network
+* Account-aware request budgeting
+* Exponential backoff for transient failures
+* Provider-agnostic design
+
+The RPC client encapsulates transport, retry, and rate limiting concerns.
+
+---
+
+# API Surface (Read Model)
+
+The API is intentionally minimal and read-only, implemented with Go’s standard library.
+
+---
+
+## Network Status
 
 ```http
 GET /status
 ```
 
-Returns ingestion progress and indexing state per network.
+Returns ingestion progress and sync state per network.
 
 ---
 
-### Wallet Registry
+## Wallet Registry
 
 ```http
 GET  /wallets
@@ -177,24 +191,24 @@ POST /wallets
 ```
 
 * List tracked wallets
-* Add or update tracked addresses dynamically
-* New addresses join ingestion at the current block height
+* Add/update tracked addresses
+* Newly added addresses begin indexing at current chain height
 
 ---
 
-### Portfolio (Primary Read Model)
+## Portfolio (Primary Read Model)
 
 ```http
 GET /wallets/{address}/portfolio?chain_id=1
 ```
 
-Returns the **current portfolio state** for a wallet on a specific chain, enriched with token metadata.
+Returns current portfolio state for a wallet on a specific chain, enriched with token metadata.
 
-This is the canonical consumer-facing view of balances.
+This endpoint represents the canonical balance view.
 
 ---
 
-### Balance Snapshots
+## Balance Snapshots
 
 ```http
 GET /wallets/{address}/balance-snapshots?chain_id=1&limit=50&cursor_id=123
@@ -202,12 +216,11 @@ GET /wallets/{address}/balance-snapshots?chain_id=1&limit=50&cursor_id=123
 
 * Historical balances
 * Cursor-based pagination
-* Ordered deterministically
-* Suitable for reporting and visualization
+* Deterministic ordering
 
 ---
 
-### Tokens
+## Tokens
 
 ```http
 GET /tokens
@@ -217,63 +230,165 @@ Returns known ERC-20 metadata.
 
 ---
 
-## Configuration
+# Configuration
 
-All networks are configured declaratively. see [config.example.json](config.example.json)
+All network behavior is declarative via `config.json`.
 
----
+Per-network configuration includes:
 
-## Performance Characteristics
+* RPC URL
+* Rate limits
+* Block gap
+* Snapshot cadence
+* Token discovery strategy
 
-* Go process memory: **~20–25 MB** under sustained ingestion
-* Postgres memory stable after snapshot tuning
-* Storage growth dominated by transfer tables
-* Balances and snapshots remain compact and queryable
-
-The system favors **predictable performance and correctness** over raw ingestion speed.
-
----
-
-## Design Principles (Intentional)
-
-* **Ledger first, state second**
-  Raw data is immutable; derived state is rebuildable.
-
-* **Block-based determinism**
-  Snapshots and ingestion are block-driven, not time-driven.
-
-* **Chain isolation**
-  All data is explicitly scoped by `chain_id`.
-
-* **Minimal dependencies**
-  Go stdlib for HTTP; pgx for Postgres.
-
-* **Operational realism**
-  Rate limits, RPC quirks, and head instability are handled explicitly.
+Adding a new EVM chain requires no schema changes.
 
 ---
 
-## What This Demonstrates (Polychain-Relevant)
+# Performance Characteristics
 
-* Fund-grade on-chain data ingestion
-* Multichain normalization
-* SQL-first reporting design
+The system is designed for predictable, bounded resource usage under sustained ingestion.
+
+## Memory Profile
+
+Observed under sustained ingestion:
+
+* **Native execution (single chain):** ~25 MB RSS
+* **Containerized execution:** ~50–60 MB RSS
+
+Memory usage scales primarily with:
+
+* Snapshot cadence (more frequent snapshots increase allocation pressure)
+* Number of active chains
+* Address registry size
+* RPC batching behavior
+
+Memory remains **stable over time** during extended runs, with no unbounded growth observed.
+
+---
+
+## CPU Usage
+
+CPU usage is modest and workload-dependent:
+
+* Low during head polling
+* Spikes during block processing and snapshot writes
+* Scales linearly with number of configured chains
+
+In steady-state (near-head indexing), CPU remains low due to head-gap buffering.
+
+---
+
+## Database Characteristics
+
+Storage growth is dominated by append-only ledger tables:
+
+* `native_transfers`
+* `erc20_transfers`
+
+Derived tables (`balances`, `balance_snapshots`) remain compact relative to transfer volume.
+
+Snapshot storage growth is controlled by:
+
+* Block-based snapshot interval
+* Address set size
+* Chain activity level
+
+All derived state is rebuildable from ledger data.
+
+---
+
+## Ingestion Throughput
+
+Throughput depends on:
+
+* RPC provider limits
+* Configured rate limits
+* Block density (transfer-heavy vs quiet blocks)
+
+The system prioritizes:
+
+* Deterministic ordering
+* Idempotency
+* RPC stability
+
+over maximum indexing speed.
+
+---
+
+## Horizontal Characteristics
+
+Each network runs in isolation.
+
+Adding additional chains:
+
+* Increases memory and CPU linearly
+* Does not introduce shared contention across workers
+* Does not affect determinism of other networks
+
+---
+
+## Operational Stability
+
+The system has been tested under:
+
+* Long-running ingestion
+* Restart scenarios
+* Snapshot-intensive configurations
+
+Observed properties:
+
+* Restart-safe behavior
+* Stable memory footprint
+* No unbounded resource growth
+* Deterministic state reconstruction
+
+
+
+---
+
+# Design Principles
+
+**Ledger First, State Second**
+Raw on-chain data is immutable; derived state is rebuildable.
+
+**Block-Based Determinism**
+Ingestion and snapshots are driven by block height.
+
+**Chain Isolation**
+All data is scoped by `chain_id`.
+
+**Minimal Dependencies**
+Go stdlib + pgx; Postgres.
+
+**Operational Realism**
+RPC limits and provider instability are handled explicitly.
+
+---
+
+# What This Demonstrates
+
+* Deterministic multichain ingestion
 * Address-scoped portfolio accounting
-* Operational reliability under RPC constraints
-* Clear separation between events, state, and history
+* Clear separation between ledger, state, and history
+* SQL-first reporting schema
+* Operational resilience under constrained RPC environments
+* Clean separation of write and read models
 
 ---
 
-## Future Work (Out of Scope)
+# Future Extensions (Out of Scope)
 
-* Price feeds and valuation
-* PnL and cost basis
+* Valuation & pricing
+* Cost basis / PnL
 * Reorg reconciliation
-* Authentication / permissions
-* Frontend dashboards (Next.js planned)
+* Authentication layer
+* Distributed worker scaling
 
 ---
 
-## License
+# License
 
 MIT / Demonstration Use
+

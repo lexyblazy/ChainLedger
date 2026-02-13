@@ -1,36 +1,194 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Multichain Portfolio Reporting Frontend
 
-## Getting Started
+A lightweight **internal reporting dashboard** built with Next.js to visualize portfolio state and historical balances derived from the backend ingestion system.
 
-First, run the development server:
+This frontend is intentionally thin and depends entirely on backend correctness.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+It is not designed as a public explorer or retail interface.
+
+---
+
+# Purpose
+
+The frontend demonstrates how the backend’s normalized data model can power:
+
+* Portfolio overviews per wallet
+* Historical balance visualization
+* Network ingestion monitoring
+* Internal accounting workflows
+
+It acts as a read-only consumer of the API.
+
+---
+
+# Architectural Role
+
+```
+Frontend (Next.js)
+        ↓
+Backend API (Go - read layer)
+        ↓
+Postgres (derived state)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The frontend:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+* Does not compute balances
+* Does not derive state
+* Does not interact with RPC providers
+* Does not mutate data
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+All state originates from the backend.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+# Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+* Next.js (App Router)
+* React Query (data fetching + caching)
+* Tailwind CSS
+* Minimal UI components
+* Fully Dockerized production build
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The build is configured to consume:
 
-## Deploy on Vercel
+```
+NEXT_PUBLIC_API_URL
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+at build time.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+# Core Features
+
+## Portfolio View
+
+Displays:
+
+* Native asset balances
+* ERC-20 balances
+* Sorted positions
+* Optional filtering of zero balances
+* Pagination
+
+Data source:
+
+```
+GET /wallets/{address}/portfolio?chain_id=...
+```
+
+---
+
+## Historical Balance Snapshots
+
+Displays:
+
+* Historical balance progression
+* Cursor-based pagination
+* Block-derived balance state
+
+Data source:
+
+```
+GET /wallets/{address}/balance-snapshots
+```
+
+---
+
+## Network Status
+
+Displays:
+
+* Ingestion progress per chain
+* Sync height
+* Operational visibility
+
+Data source:
+
+```
+GET /status
+```
+
+---
+
+# Design Principles
+
+**Backend-Driven State**
+All balances and history are computed server-side.
+
+**Deterministic Data**
+Frontend renders derived state — it does not attempt reconciliation.
+
+**Minimal Client Logic**
+React Query is used for caching and pagination only.
+
+**Operational Simplicity**
+The frontend can be rebuilt and redeployed independently of ingestion.
+
+---
+
+# Running Locally
+
+From the project root:
+
+```bash
+./start-dev.sh
+```
+
+The frontend will be available at:
+
+```
+http://localhost:3000
+```
+
+It requires the backend API to be running.
+
+---
+
+# Production Build
+
+The frontend is built inside Docker using:
+
+```
+NEXT_PUBLIC_API_URL
+```
+
+The API URL must be correct at build time.
+
+In production, it is typically proxied behind Caddy.
+
+---
+
+# Scope Limitations
+
+The frontend does not include:
+
+* Authentication
+* Role-based access control
+* Price feeds
+* PnL computation
+* Execution capabilities
+* Public-facing polish
+
+It exists to demonstrate how normalized on-chain accounting data can be surfaced in a clean reporting interface.
+
+---
+
+# Relationship to Backend
+
+This UI is intentionally dependent on backend correctness.
+
+If backend balance logic changes, the frontend reflects it automatically.
+
+The frontend is not a source of truth.
+
+---
+
+# Status
+
+* Portfolio view: Implemented
+* Snapshot view: Implemented
+* Network status: Implemented
+* UI polish: Minimal (by design)
+

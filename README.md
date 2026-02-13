@@ -126,7 +126,7 @@ On a fresh machine:
 git clone <repo>
 cd <repo>
 cp .env.example .env
-# provide config.json
+# provide config.json in backend/config.json. See backend/config.example.json
 ./start-dev.sh
 ```
 
