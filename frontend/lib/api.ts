@@ -2,7 +2,7 @@ export async function makeRequest<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}${path}`;
+  const url = `${process.env.NEXT_PUBLIC_API_URL}${path}`;
   const res = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
@@ -21,4 +21,4 @@ export async function makeRequest<T>(
   return data;
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
