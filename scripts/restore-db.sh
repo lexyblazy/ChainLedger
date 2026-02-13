@@ -17,8 +17,8 @@ fi
 
 BACKUP_FILE=$1
 
-echo "Stopping backend..."
-docker compose stop backend
+echo "Stopping api and worker..."
+docker compose stop api worker
 
 echo "Terminating active DB connections..."
 docker compose exec db sh -c '
@@ -40,7 +40,7 @@ cat backups/$BACKUP_FILE | docker compose exec -T db sh -c \
 'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB'
 
 
-echo "Starting backend..."
-docker compose start backend
+echo "Starting api and worker..."
+docker compose start api worker
 
 echo "Restore complete."
