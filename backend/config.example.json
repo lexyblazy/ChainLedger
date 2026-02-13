@@ -5,8 +5,11 @@
       "startBlock": 21525890,
       "rpcURL": "<YOUR_RPC_URL_HERE>",
       "chainId": 1,
-      "decimals": 18,
-      "symbol": "ETH",
+      "nativeToken": {
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "decimals": 18
+      },
       "rpcRateLimit": {
         "rps": 20,
         "burst": 20,
@@ -42,8 +45,11 @@
       "startBlock": 41966223,
       "rpcURL": "<YOUR_RPC_URL_HERE>",
       "chainId": 8453,
-      "decimals": 18,
-      "symbol": "ETH",
+      "nativeToken": {
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "decimals": 18
+      },
       "rpcRateLimit": {
         "rps": 20,
         "burst": 10,

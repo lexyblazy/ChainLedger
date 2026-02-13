@@ -13,6 +13,12 @@ type Config struct {
 	SyncBlocks             bool                     `json:"syncBlocks"`
 }
 
+type NativeTokenConfig struct {
+	Name     string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Decimals int    `json:"decimals"`
+}
+
 type WorkerConfig struct {
 	RetryDelayMs                    int   `json:"retryDelayMs"`
 	MaxDelayMs                      int   `json:"maxDelayMs"`
@@ -29,8 +35,7 @@ type NetworkConfig struct {
 	RPCUrl                  string              `json:"rpcURL"`
 	ChainID                 int                 `json:"chainId"`
 	Name                    string              `json:"name"`
-	Decimals                int                 `json:"decimals"`
-	Symbol                  string              `json:"symbol"`
+	NativeToken             NativeTokenConfig   `json:"nativeToken"`
 	RPCRateLimit            RPCRateLimitConfig  `json:"rpcRateLimit"`
 	SyncWorker              WorkerConfig        `json:"syncWorker"`
 	TokenMetadata           TokenMetadataConfig `json:"tokenMetadata"`
