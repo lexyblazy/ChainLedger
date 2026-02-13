@@ -1,3 +1,4 @@
 backend/config.json
 notes.md
 .DS_Store
+.env
