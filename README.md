@@ -4,6 +4,11 @@ A **fund-grade, multichain crypto accounting and reporting backend** that ingest
 
 This system prioritizes correctness, operational realism, and clear separation between raw ledger data and derived accounting state.
 
+Live demo: https://chainledger.hashindex.io
+
+Note: Block syncing may be paused periodically due to RPC provider free-tier limits.
+The system supports continuous ingestion when adequate RPC capacity is available.
+
 ---
 
 ## Purpose
