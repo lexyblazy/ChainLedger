@@ -10,8 +10,8 @@ fi
 
 
 if [ -z "$1" ]; then
-  echo "Usage: ./restore.sh <backup_filename>"
-  echo "Example: ./restore.sh backup_20260213_143201.dump"
+  echo "Usage: ./scripts/restore-db.sh <backup_filename>"
+  echo "Example: ./scripts/restore-db.sh backup_20260213_143201.dump"
   exit 1
 fi
 

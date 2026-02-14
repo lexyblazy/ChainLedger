@@ -133,7 +133,7 @@ The frontend can be rebuilt and redeployed independently of ingestion.
 From the project root:
 
 ```bash
-./start-dev.sh
+./scripts/start-dev.sh
 ```
 
 The frontend will be available at:

@@ -163,7 +163,7 @@ Backups are stored on host disk, not inside Docker volumes.
 Use the restore script:
 
 ```bash
-./restore-db.sh backup_YYYYMMDD_HHMMSS.dump
+./scripts/restore-db.sh backup_YYYYMMDD_HHMMSS.dump
 ```
 
 The script:
