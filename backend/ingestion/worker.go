@@ -129,7 +129,9 @@ func (w *NetworkWorker) start(ctx context.Context, syncBlocks bool) error {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-ticker.C:
-				w.populateAddressSet(ctx)
+				if err := w.populateAddressSet(ctx); err != nil {
+					log.Println(w.config.Name, "error populating address set", err)
+				}
 				if len(w.addressSet) > 0 {
 					break populateAddressSetLoop
 				}
@@ -144,15 +146,27 @@ func (w *NetworkWorker) start(ctx context.Context, syncBlocks bool) error {
 	// 1. do a token discovery i.e
 	//  Find ERC-20 token contracts that have appeared in transfers, that we haven’t yet inserted into tokens,
 	//  ordered by when we first saw them. Then save this batch to the tokens table.
-	go w.tokenDiscovery(ctx)
+	go func() {
+		if err := w.tokenDiscovery(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Println(w.config.Name, "token discovery stopped with error", err)
+		}
+	}()
 
 	// 2. do a token metadata fetch i.e
 	// Read directly from the tokens table in batch and fetch the metadata for each token from the rpc,
 	// then update the token
-	go w.syncTokenMetadata(ctx)
+	go func() {
+		if err := w.syncTokenMetadata(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Println(w.config.Name, "token metadata sync stopped with error", err)
+		}
+	}()
 
 	// 3. refresh the address set every N seconds
-	go w.refreshAddressSet(ctx)
+	go func() {
+		if err := w.refreshAddressSet(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Println(w.config.Name, "address refresh stopped with error", err)
+		}
+	}()
 
 	// a configuration flag to disable block syncing temporarily for testing purposes
 	if !syncBlocks {
@@ -695,14 +709,16 @@ func (w *NetworkWorker) fetchTokensMetadata(ctx context.Context, entities []db.T
 		go func(token db.TokenEntity) {
 			defer func() { <-sem }()
 
-			meta, err := w.fetchTokenMetadata(ctx, token)
+			meta := w.fetchTokenMetadata(ctx, token)
 
 			if meta.Name == nil || meta.Symbol == nil || meta.Decimals == nil {
-				w.markTokenMetadataFetchFailed(ctx, token)
+				if err := w.markTokenMetadataFetchFailed(ctx, token); err != nil {
+					log.Println(w.config.Name, "Error marking token metadata fetch failure", err)
+				}
 				return
 			}
 
-			err = w.updateTokenMetadata(ctx, token, meta)
+			err := w.updateTokenMetadata(ctx, token, meta)
 			if err != nil {
 				log.Println(w.config.Name, "Error updating token metadata", err)
 			}
@@ -712,7 +728,7 @@ func (w *NetworkWorker) fetchTokensMetadata(ctx context.Context, entities []db.T
 	return nil
 }
 
-func (w *NetworkWorker) fetchTokenMetadata(ctx context.Context, entity db.TokenEntity) (*TokenMetadata, error) {
+func (w *NetworkWorker) fetchTokenMetadata(ctx context.Context, entity db.TokenEntity) *TokenMetadata {
 
 	meta := &TokenMetadata{}
 	tokenAddress := addrUtil.Format(entity.TokenAddress)
@@ -732,7 +748,7 @@ func (w *NetworkWorker) fetchTokenMetadata(ctx context.Context, entity db.TokenE
 		meta.Symbol = &symbol
 	}
 
-	return meta, nil
+	return meta
 }
 
 func (w *NetworkWorker) updateTokenMetadata(ctx context.Context, entity db.TokenEntity, meta *TokenMetadata) error {
