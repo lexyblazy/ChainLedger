@@ -51,12 +51,16 @@ func (s *Server) jsonHandler(fn func(r *http.Request) (any, int, error)) http.Ha
 			var errorResponse ErrorResponse
 			errorResponse.Error = err.Error()
 			log.Println("Route Handler Error:", r.Method, r.URL.Path, err, "Status Code:", statusCode)
-			json.NewEncoder(w).Encode(errorResponse)
+			if encodeErr := json.NewEncoder(w).Encode(errorResponse); encodeErr != nil {
+				log.Println("Error writing error response:", encodeErr)
+			}
 
 			return
 		}
 
-		json.NewEncoder(w).Encode(data)
+		if encodeErr := json.NewEncoder(w).Encode(data); encodeErr != nil {
+			log.Println("Error writing response:", encodeErr)
+		}
 	}
 }
 
@@ -71,7 +75,9 @@ func (s *Server) SetupRoutes(router *http.ServeMux) {
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello, World!"))
+		if _, err := w.Write([]byte("Hello, World!")); err != nil {
+			log.Println("Error writing root response:", err)
+		}
 	})
 
 }
