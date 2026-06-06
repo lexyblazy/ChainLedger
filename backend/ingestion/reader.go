@@ -3,9 +3,11 @@ package ingestion
 import (
 	"context"
 	"log"
+	"strings"
 	"sync"
 
 	"encoding/json"
+
 	"github.com/lexyblazy/chainledger/config"
 	"github.com/lexyblazy/chainledger/db"
 	"github.com/lexyblazy/chainledger/internal/hex"
@@ -119,10 +121,28 @@ func (w *NetworkReader) getBestRpcBlockNumber(ctx context.Context) (int64, error
 
 func (w *NetworkReader) fetchERC20TransferLogs(ctx context.Context, blockNumber int64) ([]rpc.Log, error) {
 
+	//  Quick note about RPC provider preferences/compatibility:
+	// Some RPC providers prefer the string representation of the block number (e.g. "0x1234567890") - e.g Alchemy
+	// while others prefer the integer representation (e.g. 1234567890). e.g Chainstack
+	// Anything otherwise results in a client error. Provider specific documentation should be consulted.
+
+	// this is a temporary solution to handle the different RPC provider preferences.
+
+	var fromBlock interface{}
+	var toBlock interface{}
+
+	if isChainstackRpcProvider(w.config.RPCUrl) {
+		fromBlock = blockNumber
+		toBlock = blockNumber
+	} else {
+		fromBlock = hex.IntToHex(blockNumber)
+		toBlock = hex.IntToHex(blockNumber)
+	}
+
 	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
 		return w.rpcc.Call(ctx, "eth_getLogs", []interface{}{map[string]interface{}{
-			"fromBlock": hex.IntToHex(blockNumber),
-			"toBlock":   hex.IntToHex(blockNumber),
+			"fromBlock": fromBlock,
+			"toBlock":   toBlock,
 			"topics":    []string{w.config.ERC20TransferTopic},
 		}})
 	})
@@ -216,10 +236,30 @@ func (w *NetworkReader) fetchTokenMetadataSymbol(ctx context.Context, tokenAddre
 	return hex.DecodeStringOrBytes32(symbol)
 }
 
+func isAlchemyRpcProvider(url string) bool {
+	return strings.Contains(url, "alchemy")
+}
+
+func isChainstackRpcProvider(url string) bool {
+	return strings.Contains(url, "chainstack")
+}
+
 func (w *NetworkReader) fetchBlockWithTransactions(ctx context.Context, blockNumber int64) (rpc.Block, error) {
+	//  Quick note about RPC provider preferences/compatibility:
+	// Some RPC providers prefer the string representation of the block number (e.g. "0x1234567890") - e.g Alchemy
+	// while others prefer the integer representation (e.g. 1234567890). e.g Chainstack
+	// Anything otherwise results in a client error. Provider specific documentation should be consulted.
+
+	// this is a temporary solution to handle the different RPC provider preferences.
+	var params []interface{}
+	if isChainstackRpcProvider(w.config.RPCUrl) {
+		params = []interface{}{blockNumber, true}
+	} else {
+		params = []interface{}{hex.IntToHex(blockNumber), true}
+	}
 
 	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
-		return w.rpcc.Call(ctx, "eth_getBlockByNumber", []interface{}{hex.IntToHex(blockNumber), true})
+		return w.rpcc.Call(ctx, "eth_getBlockByNumber", params)
 	})
 	if err != nil {
 		return rpc.Block{}, err
@@ -232,4 +272,31 @@ func (w *NetworkReader) fetchBlockWithTransactions(ctx context.Context, blockNum
 	}
 
 	return block, nil
+}
+
+func (w *NetworkReader) fetchBlockReceipts(ctx context.Context, blockNumber int64) ([]rpc.TransactionReceipt, error) {
+	// same rpc provider notes as fetchBlockWithTransactions
+
+	var params []interface{}
+	if isChainstackRpcProvider(w.config.RPCUrl) {
+		params = []interface{}{blockNumber}
+	} else {
+		params = []interface{}{hex.IntToHex(blockNumber)}
+	}
+
+	rpcResult, err := w.rpcc.CallRpcWithRetry(ctx, func() (json.RawMessage, error) {
+		return w.rpcc.Call(ctx, "eth_getBlockReceipts", params)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var receipts []rpc.TransactionReceipt
+	err = json.Unmarshal(rpcResult, &receipts)
+	if err != nil {
+		return nil, err
+	}
+
+	return receipts, nil
 }
