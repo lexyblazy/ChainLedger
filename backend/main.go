@@ -34,11 +34,11 @@ func main() {
 
 	dbUrl := os.Getenv("DATABASE_URL")
 	if dbUrl == "" {
-		dbUrl = config.DatabaseURL
+		dbUrl = config.Database.URL
 		log.Println("DATABASE_URL is not set, using default from config.json")
 	}
 
-	db, err := db.NewDB(dbUrl)
+	db, err := db.NewDB(config.Database.URL)
 	if err != nil {
 		log.Fatal(err)
 	}

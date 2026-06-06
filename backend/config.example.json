@@ -81,7 +81,10 @@
       }
     }
   },
-  "databaseURL": "<YOUR_DATABASE_URL_HERE>",
+  "database": {
+    "url": "<YOUR_DATABASE_URL_HERE>",
+    "chunkSize": 1000
+  },
 
   "api": {
     "port": "<YOUR_API_PORT_HERE>",

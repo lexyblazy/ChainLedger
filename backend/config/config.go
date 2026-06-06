@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	Networks               map[string]NetworkConfig `json:"networks"`
-	DatabaseURL            string                   `json:"databaseURL"`
+	Database               DatabaseConfig           `json:"database"`
 	Api                    ApiConfig                `json:"api"`
 	ShutdownTimeoutSeconds int                      `json:"shutdownTimeoutSeconds"`
 	SyncBlocks             bool                     `json:"syncBlocks"`
@@ -61,6 +61,11 @@ type RPCRateLimitConfig struct {
 	Burst         int `json:"burst"`
 	MaxRetryCount int `json:"maxRetryCount"`
 	RetryDelayMs  int `json:"retryDelayMs"`
+}
+
+type DatabaseConfig struct {
+	URL string `json:"url"`
+	ChunkSize int `json:"chunkSize"` // to specifically avoid too many parameters error
 }
 
 func LoadConfig(path string) (*Config, error) {

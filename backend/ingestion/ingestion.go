@@ -51,6 +51,7 @@ func New(db *db.DB, config *config.Config) *IngestionService {
 		nr := NewNetworkReader(db, &network)
 		workers[network.ChainID] = &NetworkWorker{
 			db:         db,
+			dbConfig:   &config.Database,
 			config:     &network,
 			addressSet: make(map[string]bool),
 			nr:         nr,
@@ -67,7 +68,7 @@ func New(db *db.DB, config *config.Config) *IngestionService {
 	}
 }
 
-func (s *IngestionService) Start(ctx context.Context) error {
+func (s *IngestionService)  Start(ctx context.Context) error {
 	log.Println("Ingestion service started")
 
 	for _, nw := range s.nw {
