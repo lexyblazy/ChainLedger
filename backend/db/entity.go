@@ -46,3 +46,14 @@ type BalanceEntity struct {
 	CreatedAt     time.Time `json:"-"`
 	UpdatedAt     time.Time `json:"-"`
 }
+
+type BlockEntity struct {
+	ChainID       int64     `json:"chain_id"`
+	BlockNumber   int64     `json:"block_number"`
+	BlockHash     string    `json:"block_hash"`
+	ParentHash    string    `json:"parent_hash"`
+	Timestamp     time.Time `json:"timestamp"`
+	Canonical     bool      `json:"canonical"`
+	CreatedAt     time.Time `json:"-"`
+	UpdatedAt     time.Time `json:"-"`
+}
